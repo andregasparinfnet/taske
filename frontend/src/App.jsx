@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import axios from 'axios';
 import './App.css';
 import {
   LayoutDashboard,
@@ -13,27 +14,34 @@ import {
   DollarSign
 } from 'lucide-react';
 
-// Mock de Dados Inicial
-const INITIAL_DATA = [
-  { id: 1, title: 'Entrega de Laudo - Processo TJ-RJ 8921', date: '2023-10-25T14:00', type: 'PERICIA' },
-  { id: 2, title: 'Reunião Escolar - Pedro', date: '2023-10-26T09:00', type: 'FAMILIA' },
-  { id: 3, title: 'Revisão Fiscal Trimestral', date: '2023-10-28T10:00', type: 'FINANCEIRO' },
-  { id: 4, title: 'Almoço com Sócios', date: '2023-10-27T12:30', type: 'TRABALHO' },
-];
-
 function App() {
-  const [appointments, setAppointments] = useState(INITIAL_DATA);
+  const [compromissos, setCompromissos] = useState([]);
   const [formData, setFormData] = useState({
-    title: '',
-    date: '',
-    type: 'PERICIA'
+    titulo: '',
+    dataHora: '',
+    tipo: 'PERICIA'
   });
+  const [erro, setErro] = useState('');
 
-  // Cálculo de Resumo (Stats)
+  // Carregar dados ao iniciar
+  useEffect(() => {
+    carregarCompromissos();
+  }, []);
+
+  const carregarCompromissos = async () => {
+    try {
+      const response = await axios.get('http://localhost:8080/api/compromissos');
+      setCompromissos(response.data);
+    } catch (error) {
+      console.error("Erro ao carregar compromissos", error);
+    }
+  };
+
+  // Stats calculation based on real data
   const stats = {
-    total: appointments.length,
-    pericias: appointments.filter(a => a.type === 'PERICIA').length,
-    proximos: appointments.filter(a => new Date(a.date) > new Date()).length
+    total: compromissos.length,
+    pericias: compromissos.filter(a => a.tipo === 'PERICIA').length,
+    proximos: compromissos.filter(a => new Date(a.dataHora) > new Date()).length
   };
 
   const handleInputChange = (e) => {
@@ -44,21 +52,32 @@ function App() {
     }));
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!formData.title || !formData.date) return;
+    setErro('');
 
-    const newAppointment = {
-      id: Date.now(),
-      ...formData
-    };
-
-    setAppointments([newAppointment, ...appointments]);
-    setFormData({ title: '', date: '', type: 'PERICIA' }); // Reset form
+    try {
+      await axios.post('http://localhost:8080/api/compromissos', formData);
+      setFormData({ titulo: '', dataHora: '', tipo: 'PERICIA' }); // Reset form
+      carregarCompromissos(); // Reload list
+    } catch (error) {
+      console.error("Erro ao salvar", error);
+      if (error.response && error.response.status === 400) {
+        setErro("Preencha todos os campos obrigatórios corretamente.");
+      } else {
+        setErro("Ocorreu um erro ao salvar o compromisso.");
+      }
+    }
   };
 
-  const handleDelete = (id) => {
-    setAppointments(appointments.filter(a => a.id !== id));
+  const handleDelete = async (id) => {
+    if (!window.confirm("Tem certeza que deseja excluir?")) return;
+    try {
+      await axios.delete(`http://localhost:8080/api/compromissos/${id}`);
+      carregarCompromissos();
+    } catch (error) {
+      console.error("Erro ao excluir", error);
+    }
   };
 
   const getBadgeClass = (type) => {
@@ -104,6 +123,8 @@ function App() {
       </header>
 
       <main className="main-content">
+        {erro && <div className="error-banner" style={{ background: '#FEE2E2', color: '#B91C1C', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', border: '1px solid #F87171' }}>{erro}</div>}
+
         {/* 2. Cards de Resumo */}
         <section className="stats-grid">
           <div className="stat-card">
@@ -140,9 +161,9 @@ function App() {
                 <label>Título</label>
                 <input
                   type="text"
-                  name="title"
+                  name="titulo"
                   placeholder="Ex: Entrega de Laudo..."
-                  value={formData.title}
+                  value={formData.titulo}
                   onChange={handleInputChange}
                   required
                 />
@@ -153,15 +174,15 @@ function App() {
                   <label>Data e Hora</label>
                   <input
                     type="datetime-local"
-                    name="date"
-                    value={formData.date}
+                    name="dataHora"
+                    value={formData.dataHora}
                     onChange={handleInputChange}
                     required
                   />
                 </div>
                 <div className="form-group">
                   <label>Tipo</label>
-                  <select name="type" value={formData.type} onChange={handleInputChange}>
+                  <select name="tipo" value={formData.tipo} onChange={handleInputChange}>
                     <option value="PERICIA">Perícia</option>
                     <option value="TRABALHO">Trabalho</option>
                     <option value="FAMILIA">Família</option>
@@ -180,21 +201,21 @@ function App() {
           <section className="card list-section">
             <div className="card-header">
               <h2>Próximos Compromissos</h2>
-              <button className="btn-ghost">Ver todos</button>
+              <button className="btn-ghost" onClick={carregarCompromissos}>Atualizar</button>
             </div>
             <div className="list-container">
-              {appointments.length === 0 ? (
+              {compromissos.length === 0 ? (
                 <div className="empty-state">Nenhum compromisso agendado.</div>
               ) : (
-                appointments.map((item) => (
+                compromissos.map((item) => (
                   <div key={item.id} className="list-item">
                     <div className="item-icon">
-                      {getTypeIcon(item.type)}
+                      {getTypeIcon(item.tipo)}
                     </div>
                     <div className="item-content">
-                      <h3>{item.title}</h3>
+                      <h3>{item.titulo}</h3>
                       <span className="item-date">
-                        {new Date(item.date).toLocaleString('pt-BR', {
+                        {new Date(item.dataHora).toLocaleString('pt-BR', {
                           weekday: 'short',
                           day: '2-digit',
                           month: 'long',
@@ -203,8 +224,8 @@ function App() {
                         })}
                       </span>
                     </div>
-                    <div className={`badge ${getBadgeClass(item.type)}`}>
-                      {item.type}
+                    <div className={`badge ${getBadgeClass(item.tipo)}`}>
+                      {item.tipo}
                     </div>
                     <div className="item-actions">
                       <button className="btn-icon"><Edit2 size={16} /></button>
