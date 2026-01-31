@@ -103,4 +103,39 @@ describe('Login Component', () => {
             expect(screen.getByText(/já existe/i)).toBeInTheDocument();
         });
     });
+
+    it('deve exibir erro genérico se resposta não for string', async () => {
+        axios.post.mockRejectedValueOnce({
+            response: { data: { erro: 'Objeto de erro complexo' } }
+        });
+
+        render(<Login onLogin={mockOnLogin} />);
+
+        await userEvent.click(screen.getByText(/não tem conta/i));
+
+        await userEvent.type(screen.getByPlaceholderText(/ex: ana.silva/i), 'usererror');
+        await userEvent.type(screen.getByPlaceholderText(/mínimo de 6 caracteres/i), 'senha123');
+        await userEvent.click(screen.getByRole('button', { name: /cadastrar/i }));
+
+        await waitFor(() => {
+            expect(screen.getByText('Erro ao cadastrar.')).toBeInTheDocument();
+        });
+    });
+
+    it('deve exibir erro genérico se falha sem resposta do servidor', async () => {
+        // Simular erro de rede (sem response.data)
+        axios.post.mockRejectedValueOnce(new Error('Network Error'));
+
+        render(<Login onLogin={mockOnLogin} />);
+
+        await userEvent.click(screen.getByText(/não tem conta/i));
+
+        await userEvent.type(screen.getByPlaceholderText(/ex: ana.silva/i), 'networkerror');
+        await userEvent.type(screen.getByPlaceholderText(/mínimo de 6 caracteres/i), 'senha123');
+        await userEvent.click(screen.getByRole('button', { name: /cadastrar/i }));
+
+        await waitFor(() => {
+            expect(screen.getByText('Erro ao criar conta. Tente novamente.')).toBeInTheDocument();
+        });
+    });
 });

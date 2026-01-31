@@ -10,10 +10,17 @@ export default defineConfig({
         coverage: {
             provider: 'v8',
             reporter: ['text', 'html'],
+            thresholds: {
+                statements: 99,
+                branches: 99,
+                functions: 99,
+                lines: 99
+            },
             exclude: [
                 'node_modules/',
                 'src/test/',
                 'src/main.jsx',
+                '**/*.test.jsx',
                 '*.config.js',
                 '*.config.ts'
             ]

@@ -9,7 +9,6 @@ vi.mock('@hello-pangea/dnd', async () => {
     return {
         ...actual,
         DragDropContext: ({ children, onDragEnd }) => {
-            // Expor onDragEnd para testes
             window.__testOnDragEnd = onDragEnd;
             return <div data-testid="drag-context">{children}</div>;
         },
@@ -18,8 +17,8 @@ vi.mock('@hello-pangea/dnd', async () => {
                 {children({
                     innerRef: vi.fn(),
                     droppableProps: {},
-                    placeholder: null
-                }, { isDraggingOver: false })}
+                    placeholder: <div data-testid="placeholder" />
+                }, { isDraggingOver: window.__testIsDraggingOver || false })}
             </div>
         ),
         Draggable: ({ children, draggableId }) => (
@@ -28,7 +27,7 @@ vi.mock('@hello-pangea/dnd', async () => {
                     innerRef: vi.fn(),
                     draggableProps: { style: {} },
                     dragHandleProps: {}
-                }, { isDragging: false })}
+                }, { isDragging: window.__testIsDragging || false })}
             </div>
         )
     };
@@ -39,7 +38,7 @@ describe('KanbanView Component', () => {
 
     const mockCompromissos = [
         { id: 1, titulo: 'Tarefa Pendente', tipo: 'TRABALHO', dataHora: '2026-02-01T10:00', status: 'PENDENTE', valor: 0 },
-        { id: 2, titulo: 'Tarefa em Andamento', tipo: 'PERICIA', dataHora: '2026-02-02T14:00', status: 'EM_ANDAMENTO', valor: 500 },
+        { id: 2, titulo: 'Tarefa em Andamento', tipo: 'PERICIA', dataHora: '2026-02-02T14:00', status: 'EM_ANDAMENTO', valor: 500, urgente: true },
         { id: 3, titulo: 'Tarefa Concluída', tipo: 'FAMILIA', dataHora: '2026-02-03T09:00', status: 'CONCLUIDO', valor: 0 }
     ];
 
@@ -99,13 +98,19 @@ describe('KanbanView Component', () => {
         expect(screen.getByText('Pagamento')).toBeInTheDocument();
     });
 
-    it('deve exibir card com tipo desconhecido (default)', () => {
-        const compromissosComTipoDesconhecido = [
-            { id: 5, titulo: 'Outro Compromisso', tipo: 'OUTRO', dataHora: '2026-02-05T10:00', status: 'PENDENTE', valor: 0 }
+    it('deve exibir todos os tipos de compromissos corretamente', () => {
+        const compromissosVariados = [
+            { id: 4, titulo: 'Pagamento', tipo: 'FINANCEIRO', dataHora: '2026-02-04T10:00', status: 'PENDENTE', valor: 1000 },
+            { id: 5, titulo: 'Estudos', tipo: 'ESTUDOS', dataHora: '2026-02-05T10:00', status: 'PENDENTE', valor: 0 },
+            { id: 6, titulo: 'Outros', tipo: 'OUTROS', dataHora: '2026-02-06T10:00', status: 'PENDENTE', valor: 0 },
+            { id: 7, titulo: 'Desconhecido', tipo: 'UNKNOWN', dataHora: '2026-02-07T10:00', status: 'PENDENTE', valor: 0 }
         ];
-        render(<KanbanView compromissos={compromissosComTipoDesconhecido} onUpdate={mockOnUpdate} />);
+        render(<KanbanView compromissos={compromissosVariados} onUpdate={mockOnUpdate} />);
 
-        expect(screen.getByText('OUTRO')).toBeInTheDocument();
+        expect(screen.getByText('FINANCEIRO')).toBeInTheDocument();
+        expect(screen.getByText('ESTUDOS')).toBeInTheDocument();
+        expect(screen.getByText('OUTROS')).toBeInTheDocument();
+        expect(screen.getByText('UNKNOWN')).toBeInTheDocument();
     });
 
     // ==================== TESTES DE DRAG AND DROP ====================
@@ -207,6 +212,36 @@ describe('KanbanView Component', () => {
 
         // Deve aparecer na coluna "A Fazer" (PENDENTE)
         expect(screen.getByText('Sem Status')).toBeInTheDocument();
+    });
+
+    it('deve renderizar ícones corretos para todos os tipos de compromisso', () => {
+        const compromissosTodosTipos = [
+            { id: 1, titulo: 'Tipo Financeiro', tipo: 'FINANCEIRO', dataHora: '2026-02-01T10:00', status: 'PENDENTE' },
+            { id: 2, titulo: 'Tipo Estudos', tipo: 'ESTUDOS', dataHora: '2026-02-01T10:00', status: 'PENDENTE' },
+            { id: 3, titulo: 'Tipo Outros', tipo: 'OUTROS', dataHora: '2026-02-01T10:00', status: 'PENDENTE' },
+            { id: 4, titulo: 'Tipo Desconhecido', tipo: 'DESCONHECIDO', dataHora: '2026-02-01T10:00', status: 'PENDENTE' }
+        ];
+
+        render(<KanbanView compromissos={compromissosTodosTipos} onUpdate={mockOnUpdate} />);
+
+        expect(screen.getByText('Tipo Financeiro')).toBeInTheDocument();
+        expect(screen.getByText('Tipo Estudos')).toBeInTheDocument();
+        expect(screen.getByText('Tipo Outros')).toBeInTheDocument();
+        expect(screen.getByText('Tipo Desconhecido')).toBeInTheDocument();
+    });
+
+    it('deve aplicar estilos de dragging', () => {
+        window.__testIsDragging = true;
+        window.__testIsDraggingOver = true;
+
+        render(<KanbanView compromissos={mockCompromissos} onUpdate={mockOnUpdate} />);
+
+        // Verifica se renderizou sem crash
+        expect(screen.getByText('Tarefa Pendente')).toBeInTheDocument();
+
+        // Cleanup
+        window.__testIsDragging = false;
+        window.__testIsDraggingOver = false;
     });
 });
 

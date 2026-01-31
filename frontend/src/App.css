@@ -403,6 +403,16 @@
   color: var(--warning);
 }
 
+.tag.ESTUDOS {
+  background: #FCE7F3;
+  color: #DB2777;
+}
+
+.tag.OUTROS {
+  background: #F3F4F6;
+  color: #4B5563;
+}
+
 .item-actions {
   display: flex;
   gap: 0.5rem;

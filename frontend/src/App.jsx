@@ -4,6 +4,8 @@ import Login from './Login';
 import KanbanView from './KanbanView';
 import AgendaView from './AgendaView';
 import DashboardView from './DashboardView';
+import Toast from './Toast';
+import ConfirmModal from './ConfirmModal';
 import './App.css';
 import {
   LayoutDashboard,
@@ -19,23 +21,28 @@ import {
   LogOut,
   ChevronRight,
   Search,
-  List
+  List,
+  BookOpen,
+  MoreHorizontal,
+  AlertTriangle
 } from 'lucide-react';
 
 function App() {
   const [user, setUser] = useState(null);
   const [compromissos, setCompromissos] = useState([]);
-  const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, agenda, kanban
+  const [activeTab, setActiveTab] = useState('agenda'); // agenda, dashboard, kanban
   const [formData, setFormData] = useState({
     titulo: '',
     dataHora: '',
     tipo: 'PERICIA',
     status: 'PENDENTE',
     valor: '',
-    descricao: ''
+    descricao: '',
+    urgente: false
   });
   const [erro, setErro] = useState('');
   const [editingId, setEditingId] = useState(null);
+  const [toast, setToast] = useState(null);
 
   useEffect(() => {
     const savedAuth = localStorage.getItem('auth');
@@ -48,6 +55,10 @@ function App() {
       }
     }
   }, []);
+
+  const showToast = (message, type = 'success') => {
+    setToast({ message, type });
+  };
 
   const carregarCompromissos = async () => {
     try {
@@ -73,8 +84,11 @@ function App() {
   };
 
   const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: type === 'checkbox' ? checked : value
+    }));
   };
 
   const handleSubmit = async (e) => {
@@ -83,14 +97,17 @@ function App() {
     try {
       if (editingId) {
         await axios.put(`http://localhost:8080/api/compromissos/${editingId}`, formData);
+        showToast('Compromisso atualizado com sucesso!');
         setEditingId(null);
       } else {
         await axios.post('http://localhost:8080/api/compromissos', formData);
+        showToast('Compromisso criado com sucesso!');
       }
-      setFormData({ titulo: '', dataHora: '', tipo: 'PERICIA', status: 'PENDENTE', valor: '', descricao: '' });
+      setFormData({ titulo: '', dataHora: '', tipo: 'PERICIA', status: 'PENDENTE', valor: '', descricao: '', urgente: false });
       carregarCompromissos();
     } catch (error) {
       setErro("Erro ao salvar. Verifique os campos.");
+      showToast('Erro ao salvar compromisso', 'error');
     }
   };
 
@@ -101,17 +118,35 @@ function App() {
       tipo: item.tipo,
       status: item.status || 'PENDENTE',
       valor: item.valor || '',
-      descricao: item.descricao || ''
+      descricao: item.descricao || '',
+      urgente: item.urgente || false
     });
     setEditingId(item.id);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Excluir este item?")) return;
+  // Estado para o modal de exclusão
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
+
+  const handleDeleteClick = (id) => {
+    setItemToDelete(id);
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!itemToDelete) return;
+
     try {
-      await axios.delete(`http://localhost:8080/api/compromissos/${id}`);
+      await axios.delete(`http://localhost:8080/api/compromissos/${itemToDelete}`);
+      showToast('Compromisso excluído com sucesso!');
       carregarCompromissos();
-    } catch (error) { console.error(error); }
+    } catch (error) {
+      console.error(error);
+      showToast('Erro ao excluir compromisso', 'error');
+    } finally {
+      setDeleteModalOpen(false);
+      setItemToDelete(null);
+    }
   };
 
   const handleUpdateItem = (updatedItem) => {
@@ -124,6 +159,8 @@ function App() {
       case 'TRABALHO': return <Briefcase size={18} />;
       case 'FAMILIA': return <Users size={18} />;
       case 'FINANCEIRO': return <DollarSign size={18} />;
+      case 'ESTUDOS': return <BookOpen size={18} />;
+      case 'OUTROS': return <MoreHorizontal size={18} />;
       default: return <Calendar size={18} />;
     }
   };
@@ -138,6 +175,15 @@ function App() {
 
   return (
     <div className="app-container">
+      {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
+
+      <ConfirmModal
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="Excluir Compromisso"
+        message="Tem certeza que deseja excluir este item? Esta ação não pode ser desfeita."
+      />
 
       {/* Sidebar */}
       <nav className="sidebar">
@@ -147,13 +193,13 @@ function App() {
         </div>
 
         <div className="nav-menu">
-          <button onClick={() => setActiveTab('dashboard')} className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}>
-            <LayoutDashboard size={20} />
-            <span className="sidebar-label">Dashboard</span>
-          </button>
           <button onClick={() => setActiveTab('agenda')} className={`nav-item ${activeTab === 'agenda' ? 'active' : ''}`}>
             <Calendar size={20} />
             <span className="sidebar-label">Agenda</span>
+          </button>
+          <button onClick={() => setActiveTab('dashboard')} className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}>
+            <LayoutDashboard size={20} />
+            <span className="sidebar-label">Dashboard</span>
           </button>
           <button onClick={() => setActiveTab('kanban')} className={`nav-item ${activeTab === 'kanban' ? 'active' : ''}`}>
             <List size={20} />
@@ -179,7 +225,7 @@ function App() {
 
         <header className="dashboard-header">
           <div className="dashboard-title">
-            <h1>{activeTab === 'dashboard' ? 'Visão Geral' : activeTab === 'agenda' ? 'Minha Agenda' : 'Quadro de Atividades'}</h1>
+            <h1>{activeTab === 'agenda' ? 'Minha Agenda' : activeTab === 'dashboard' ? 'Visão Geral' : 'Quadro de Atividades'}</h1>
             <p>Gerencie seus compromissos e tarefas.</p>
           </div>
         </header>
@@ -195,37 +241,159 @@ function App() {
                   <h2>Compromissos Recentes</h2>
                 </div>
                 <div className="list-container">
-                  {compromissos.map((item) => (
-                    <div key={item.id} className="list-item">
-                      <div className="item-icon-box">{getTagIcon(item.tipo)}</div>
-                      <div className="item-content">
-                        <h3 className="item-title">{item.titulo}</h3>
-                        <div className="item-meta">
-                          <span>{new Date(item.dataHora).toLocaleDateString()}</span>
+                  {compromissos.length === 0 ? (
+                    <div className="empty-state">
+                      <p>Nenhum compromisso encontrado.</p>
+                    </div>
+                  ) : (
+                    compromissos.map((item) => (
+                      <div key={item.id} className="list-item">
+                        <div className="item-icon-box">{getTagIcon(item.tipo)}</div>
+                        <div className="item-content">
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <h3 className="item-title">{item.titulo}</h3>
+                              {item.urgente && (
+                                <span style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  fontSize: '0.7rem',
+                                  color: 'var(--danger)',
+                                  background: 'rgba(239, 68, 68, 0.1)',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  fontWeight: '600'
+                                }}>
+                                  <AlertTriangle size={12} /> URGENTE
+                                </span>
+                              )}
+                            </div>
+                            {item.valor > 0 && <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--success)' }}>R$ {item.valor.toFixed(2)}</span>}
+                          </div>
+                          <div className="item-meta">
+                            <span>{new Date(item.dataHora).toLocaleDateString()} {new Date(item.dataHora).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                            <span style={{ fontSize: '0.75rem', padding: '2px 6px', background: 'var(--bg-body)', borderRadius: '4px' }}>{item.status || 'PENDENTE'}</span>
+                          </div>
+                          {item.descricao && <p style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.descricao}</p>}
+                        </div>
+                        <div className="item-actions">
+                          <button className="action-btn" onClick={() => handleEdit(item)}><Edit2 size={16} /></button>
+                          <button className="action-btn delete" onClick={() => handleDeleteClick(item.id)}><Trash2 size={16} /></button>
                         </div>
                       </div>
-                      <div className="item-actions">
-                        <button className="action-btn" onClick={() => handleEdit(item)}><Edit2 size={16} /></button>
-                        <button className="action-btn delete" onClick={() => handleDelete(item.id)}><Trash2 size={16} /></button>
-                      </div>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </section>
 
               {/* Form (Simplified for Dashboard) */}
               <section className="card form-section">
-                <div className="card-header"><h2>{editingId ? 'Editar' : 'Novo Rápido'}</h2></div>
+                <div className="card-header">
+                  <h2>{editingId ? 'Editar Compromisso' : 'Novo Compromisso'}</h2>
+                </div>
                 <form onSubmit={handleSubmit} className="form-body">
+
                   <div className="input-group">
                     <label>Título</label>
-                    <input type="text" className="input-field" name="titulo" value={formData.titulo} onChange={handleInputChange} required />
+                    <div className="input-wrapper">
+                      <Edit2 size={18} />
+                      <input
+                        type="text"
+                        className="input-field"
+                        name="titulo"
+                        placeholder="Ex: Reunião de Pauta"
+                        value={formData.titulo}
+                        onChange={handleInputChange}
+                        required
+                      />
+                    </div>
                   </div>
+
                   <div className="input-group">
-                    <label>Data</label>
-                    <input type="datetime-local" className="input-field" name="dataHora" value={formData.dataHora} onChange={handleInputChange} required />
+                    <label>Data e Hora</label>
+                    <div className="input-wrapper">
+                      <Calendar size={18} />
+                      <input
+                        type="datetime-local"
+                        className="input-field"
+                        name="dataHora"
+                        value={formData.dataHora}
+                        onChange={handleInputChange}
+                        required
+                      />
+                    </div>
                   </div>
-                  <button type="submit" className="submit-btn"><Plus size={18} /> Salvar</button>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                    <div className="input-group">
+                      <label>Tipo</label>
+                      <div className="input-wrapper">
+                        <Briefcase size={18} />
+                        <select className="input-field" name="tipo" value={formData.tipo} onChange={handleInputChange}>
+                          <option value="PERICIA">Perícia</option>
+                          <option value="TRABALHO">Trabalho</option>
+                          <option value="FAMILIA">Família</option>
+                          <option value="FINANCEIRO">Financeiro</option>
+                          <option value="ESTUDOS">Estudos</option>
+                          <option value="OUTROS">Outros</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="input-group">
+                      <label>Valor (R$)</label>
+                      <div className="input-wrapper">
+                        <DollarSign size={18} />
+                        <input
+                          type="number"
+                          step="0.01"
+                          className="input-field"
+                          name="valor"
+                          placeholder="0.00"
+                          value={formData.valor}
+                          onChange={handleInputChange}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="input-group" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <input
+                      type="checkbox"
+                      id="urgente"
+                      name="urgente"
+                      checked={formData.urgente}
+                      onChange={handleInputChange}
+                      style={{ width: '18px', height: '18px', cursor: 'pointer' }}
+                    />
+                    <label htmlFor="urgente" style={{ margin: 0, cursor: 'pointer', color: 'var(--danger)', fontWeight: 600 }}>Marcar como Urgente</label>
+                  </div>
+
+                  <div className="input-group">
+                    <label>Descrição</label>
+                    <textarea
+                      className="input-field"
+                      name="descricao"
+                      rows="2"
+                      placeholder="Detalhes adicionais..."
+                      value={formData.descricao}
+                      onChange={handleInputChange}
+                      style={{ paddingLeft: '1rem' }} // Textarea doesn't need big left padding usually unless icon
+                    ></textarea>
+                  </div>
+
+                  <button type="submit" className="submit-btn">
+                    {editingId ? <CheckCircle size={18} /> : <Plus size={18} />}
+                    {editingId ? 'Atualizar' : 'Salvar Compromisso'}
+                  </button>
+
+                  {editingId && (
+                    <button type="button" onClick={() => { setEditingId(null); setFormData({ titulo: '', dataHora: '', tipo: 'PERICIA', status: 'PENDENTE', valor: '', descricao: '', urgente: false }); }} style={{ marginTop: '0.5rem', width: '100%', padding: '0.5rem', background: 'transparent', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
+                      Cancelar Edição
+                    </button>
+                  )}
+
                 </form>
               </section>
             </div>

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { Calendar, Briefcase, Users, DollarSign, Gavel } from 'lucide-react';
+import { Calendar, Briefcase, Users, DollarSign, Gavel, BookOpen, MoreHorizontal, AlertTriangle } from 'lucide-react';
 import axios from 'axios';
 
 const KanbanView = ({ compromissos, onUpdate }) => {
@@ -10,15 +10,7 @@ const KanbanView = ({ compromissos, onUpdate }) => {
         CONCLUIDO: { id: 'CONCLUIDO', title: 'Concluído', color: 'green' }
     });
 
-    const getTagIcon = (type) => {
-        switch (type) {
-            case 'PERICIA': return <Gavel size={14} />;
-            case 'TRABALHO': return <Briefcase size={14} />;
-            case 'FAMILIA': return <Users size={14} />;
-            case 'FINANCEIRO': return <DollarSign size={14} />;
-            default: return <Calendar size={14} />;
-        }
-    };
+
 
     const onDragEnd = async (result) => {
         const { destination, source, draggableId } = result;
@@ -53,11 +45,12 @@ const KanbanView = ({ compromissos, onUpdate }) => {
                 {Object.values(columns).map(column => (
                     <div key={column.id} className="kanban-column" style={{
                         flex: '0 0 300px',
-                        background: 'var(--bg-body)',
+                        background: column.color === 'blue' ? 'rgba(59, 130, 246, 0.05)' : column.color === 'orange' ? 'rgba(245, 158, 11, 0.05)' : 'rgba(16, 185, 129, 0.05)',
                         borderRadius: '16px',
                         padding: '1rem',
                         display: 'flex',
-                        flexDirection: 'column'
+                        flexDirection: 'column',
+                        border: '1px solid rgba(0,0,0,0.02)'
                     }}>
                         <h3 style={{
                             marginBottom: '1rem',
@@ -101,14 +94,17 @@ const KanbanView = ({ compromissos, onUpdate }) => {
                                                         marginBottom: '0.75rem',
                                                         background: 'white',
                                                         borderRadius: '12px',
-                                                        border: '1px solid var(--border)',
+                                                        border: item.urgente ? '1px solid var(--danger)' : '1px solid var(--border)',
                                                         boxShadow: snapshot.isDragging ? '0 10px 20px rgba(0,0,0,0.1)' : '0 1px 3px rgba(0,0,0,0.05)',
                                                         transform: snapshot.isDragging ? 'scale(1.02) rotate(1deg)' : 'scale(1)',
                                                         ...provided.draggableProps.style
                                                     }}
                                                 >
                                                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-                                                        <span className={`tag ${item.tipo}`} style={{ fontSize: '0.65rem', padding: '2px 8px' }}>{item.tipo}</span>
+                                                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                                            <span className={`tag ${item.tipo}`} style={{ fontSize: '0.65rem', padding: '2px 8px' }}>{item.tipo}</span>
+                                                            {item.urgente && <AlertTriangle size={14} color="var(--danger)" fill="var(--danger-bg)" />}
+                                                        </div>
                                                     </div>
                                                     <h4 style={{ fontSize: '0.95rem', fontWeight: 600, color: 'var(--text-main)', marginBottom: '0.25rem' }}>{item.titulo}</h4>
                                                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: 'var(--text-muted)', fontSize: '0.8rem' }}>
