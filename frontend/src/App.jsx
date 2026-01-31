@@ -1,5 +1,9 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
+import Login from './Login';
+import KanbanView from './KanbanView';
+import AgendaView from './AgendaView';
+import DashboardView from './DashboardView';
 import './App.css';
 import {
   LayoutDashboard,
@@ -11,21 +15,38 @@ import {
   Briefcase,
   Gavel,
   Users,
-  DollarSign
+  DollarSign,
+  LogOut,
+  ChevronRight,
+  Search,
+  List
 } from 'lucide-react';
 
 function App() {
+  const [user, setUser] = useState(null);
   const [compromissos, setCompromissos] = useState([]);
+  const [activeTab, setActiveTab] = useState('dashboard'); // dashboard, agenda, kanban
   const [formData, setFormData] = useState({
     titulo: '',
     dataHora: '',
-    tipo: 'PERICIA'
+    tipo: 'PERICIA',
+    status: 'PENDENTE',
+    valor: '',
+    descricao: ''
   });
   const [erro, setErro] = useState('');
+  const [editingId, setEditingId] = useState(null);
 
-  // Carregar dados ao iniciar
   useEffect(() => {
-    carregarCompromissos();
+    const savedAuth = localStorage.getItem('auth');
+    if (savedAuth) {
+      const auth = JSON.parse(savedAuth);
+      if (auth.token) {
+        setUser(auth);
+        axios.defaults.headers.common['Authorization'] = `Bearer ${auth.token}`;
+        carregarCompromissos();
+      }
+    }
   }, []);
 
   const carregarCompromissos = async () => {
@@ -33,212 +54,194 @@ function App() {
       const response = await axios.get('http://localhost:8080/api/compromissos');
       setCompromissos(response.data);
     } catch (error) {
-      console.error("Erro ao carregar compromissos", error);
+      if (error.response && error.response.status === 403) handleLogout();
     }
   };
 
-  // Stats calculation based on real data
+  const handleLogin = (auth) => {
+    setUser(auth);
+    axios.defaults.headers.common['Authorization'] = `Bearer ${auth.token}`;
+    localStorage.setItem('auth', JSON.stringify(auth));
+    carregarCompromissos();
+  };
+
+  const handleLogout = () => {
+    setUser(null);
+    localStorage.removeItem('auth');
+    setCompromissos([]);
+    delete axios.defaults.headers.common['Authorization'];
+  };
+
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setErro('');
+    try {
+      if (editingId) {
+        await axios.put(`http://localhost:8080/api/compromissos/${editingId}`, formData);
+        setEditingId(null);
+      } else {
+        await axios.post('http://localhost:8080/api/compromissos', formData);
+      }
+      setFormData({ titulo: '', dataHora: '', tipo: 'PERICIA', status: 'PENDENTE', valor: '', descricao: '' });
+      carregarCompromissos();
+    } catch (error) {
+      setErro("Erro ao salvar. Verifique os campos.");
+    }
+  };
+
+  const handleEdit = (item) => {
+    setFormData({
+      titulo: item.titulo,
+      dataHora: item.dataHora,
+      tipo: item.tipo,
+      status: item.status || 'PENDENTE',
+      valor: item.valor || '',
+      descricao: item.descricao || ''
+    });
+    setEditingId(item.id);
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm("Excluir este item?")) return;
+    try {
+      await axios.delete(`http://localhost:8080/api/compromissos/${id}`);
+      carregarCompromissos();
+    } catch (error) { console.error(error); }
+  };
+
+  const handleUpdateItem = (updatedItem) => {
+    setCompromissos(prev => prev.map(i => i.id === updatedItem.id ? updatedItem : i));
+  };
+
+  const getTagIcon = (type) => {
+    switch (type) {
+      case 'PERICIA': return <Gavel size={18} />;
+      case 'TRABALHO': return <Briefcase size={18} />;
+      case 'FAMILIA': return <Users size={18} />;
+      case 'FINANCEIRO': return <DollarSign size={18} />;
+      default: return <Calendar size={18} />;
+    }
+  };
+
   const stats = {
     total: compromissos.length,
     pericias: compromissos.filter(a => a.tipo === 'PERICIA').length,
     proximos: compromissos.filter(a => new Date(a.dataHora) > new Date()).length
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-  };
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setErro('');
-
-    try {
-      await axios.post('http://localhost:8080/api/compromissos', formData);
-      setFormData({ titulo: '', dataHora: '', tipo: 'PERICIA' }); // Reset form
-      carregarCompromissos(); // Reload list
-    } catch (error) {
-      console.error("Erro ao salvar", error);
-      if (error.response && error.response.status === 400) {
-        setErro("Preencha todos os campos obrigatórios corretamente.");
-      } else {
-        setErro("Ocorreu um erro ao salvar o compromisso.");
-      }
-    }
-  };
-
-  const handleDelete = async (id) => {
-    if (!window.confirm("Tem certeza que deseja excluir?")) return;
-    try {
-      await axios.delete(`http://localhost:8080/api/compromissos/${id}`);
-      carregarCompromissos();
-    } catch (error) {
-      console.error("Erro ao excluir", error);
-    }
-  };
-
-  const getBadgeClass = (type) => {
-    switch (type) {
-      case 'PERICIA': return 'badge-red';
-      case 'TRABALHO': return 'badge-blue';
-      case 'FAMILIA': return 'badge-green';
-      case 'FINANCEIRO': return 'badge-yellow';
-      default: return 'badge-gray';
-    }
-  };
-
-  const getTypeIcon = (type) => {
-    switch (type) {
-      case 'PERICIA': return <Gavel size={16} />;
-      case 'TRABALHO': return <Briefcase size={16} />;
-      case 'FAMILIA': return <Users size={16} />;
-      case 'FINANCEIRO': return <DollarSign size={16} />;
-      default: return <Calendar size={16} />;
-    }
-  }
+  if (!user) return <Login onLogin={handleLogin} />;
 
   return (
     <div className="app-container">
-      {/* 1. Header */}
-      <header className="header">
+
+      {/* Sidebar */}
+      <nav className="sidebar">
         <div className="logo-container">
-          <div className="logo-icon">
-            <LayoutDashboard size={24} color="white" />
-          </div>
-          <h1>LifeOS</h1>
+          <div className="logo-bg"><LayoutDashboard size={24} /></div>
+          <span className="logo-text">LifeOS</span>
         </div>
-        <nav className="nav-menu">
-          <a href="#" className="active">Dashboard</a>
-          <a href="#">Agenda</a>
-          <a href="#">Financeiro</a>
-          <a href="#">Processos</a>
-        </nav>
+
+        <div className="nav-menu">
+          <button onClick={() => setActiveTab('dashboard')} className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`}>
+            <LayoutDashboard size={20} />
+            <span className="sidebar-label">Dashboard</span>
+          </button>
+          <button onClick={() => setActiveTab('agenda')} className={`nav-item ${activeTab === 'agenda' ? 'active' : ''}`}>
+            <Calendar size={20} />
+            <span className="sidebar-label">Agenda</span>
+          </button>
+          <button onClick={() => setActiveTab('kanban')} className={`nav-item ${activeTab === 'kanban' ? 'active' : ''}`}>
+            <List size={20} />
+            <span className="sidebar-label">Quadros</span>
+          </button>
+        </div>
+
         <div className="user-profile">
-          <span>Dr. Perito</span>
-          <div className="avatar">P</div>
+          <button onClick={handleLogout} className="nav-item logout-btn-sidebar">
+            <LogOut size={20} />
+            <span className="sidebar-label">Sair</span>
+          </button>
         </div>
-      </header>
+      </nav>
 
+      {/* Main Content */}
       <main className="main-content">
-        {erro && <div className="error-banner" style={{ background: '#FEE2E2', color: '#B91C1C', padding: '1rem', borderRadius: '8px', marginBottom: '1rem', border: '1px solid #F87171' }}>{erro}</div>}
+        <header className="mobile-header">
+          <div className="logo-bg" style={{ width: 32, height: 32 }}><LayoutDashboard size={18} /></div>
+          <h1 style={{ fontSize: '1.2rem', fontWeight: 700 }}>LifeOS</h1>
+          <button onClick={handleLogout} style={{ background: 'none', border: 'none', color: 'var(--danger)' }}><LogOut size={20} /></button>
+        </header>
 
-        {/* 2. Cards de Resumo */}
-        <section className="stats-grid">
-          <div className="stat-card">
-            <div className="stat-icon bg-blue"><Calendar size={20} /></div>
-            <div className="stat-info">
-              <span className="stat-label">Total Compromissos</span>
-              <span className="stat-value">{stats.total}</span>
-            </div>
+        <header className="dashboard-header">
+          <div className="dashboard-title">
+            <h1>{activeTab === 'dashboard' ? 'Visão Geral' : activeTab === 'agenda' ? 'Minha Agenda' : 'Quadro de Atividades'}</h1>
+            <p>Gerencie seus compromissos e tarefas.</p>
           </div>
-          <div className="stat-card">
-            <div className="stat-icon bg-red"><Gavel size={20} /></div>
-            <div className="stat-info">
-              <span className="stat-label">Perícias Pendentes</span>
-              <span className="stat-value">{stats.pericias}</span>
-            </div>
-          </div>
-          <div className="stat-card">
-            <div className="stat-icon bg-green"><CheckCircle size={20} /></div>
-            <div className="stat-info">
-              <span className="stat-label">Próximos (7 dias)</span>
-              <span className="stat-value">{stats.proximos}</span>
-            </div>
-          </div>
-        </section>
+        </header>
 
-        <div className="dashboard-grid">
-          {/* 3. Formulário de Cadastro */}
-          <section className="card form-section">
-            <div className="card-header">
-              <h2><Plus size={18} /> Novo Compromisso</h2>
-            </div>
-            <form onSubmit={handleSubmit}>
-              <div className="form-group">
-                <label>Título</label>
-                <input
-                  type="text"
-                  name="titulo"
-                  placeholder="Ex: Entrega de Laudo..."
-                  value={formData.titulo}
-                  onChange={handleInputChange}
-                  required
-                />
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>Data e Hora</label>
-                  <input
-                    type="datetime-local"
-                    name="dataHora"
-                    value={formData.dataHora}
-                    onChange={handleInputChange}
-                    required
-                  />
+        {/* Dynamic Content Area */}
+        {activeTab === 'dashboard' && (
+          <>
+            <DashboardView stats={stats} />
+            <div className="content-grid">
+              {/* List */}
+              <section className="card list-section">
+                <div className="card-header">
+                  <h2>Compromissos Recentes</h2>
                 </div>
-                <div className="form-group">
-                  <label>Tipo</label>
-                  <select name="tipo" value={formData.tipo} onChange={handleInputChange}>
-                    <option value="PERICIA">Perícia</option>
-                    <option value="TRABALHO">Trabalho</option>
-                    <option value="FAMILIA">Família</option>
-                    <option value="FINANCEIRO">Financeiro</option>
-                  </select>
+                <div className="list-container">
+                  {compromissos.map((item) => (
+                    <div key={item.id} className="list-item">
+                      <div className="item-icon-box">{getTagIcon(item.tipo)}</div>
+                      <div className="item-content">
+                        <h3 className="item-title">{item.titulo}</h3>
+                        <div className="item-meta">
+                          <span>{new Date(item.dataHora).toLocaleDateString()}</span>
+                        </div>
+                      </div>
+                      <div className="item-actions">
+                        <button className="action-btn" onClick={() => handleEdit(item)}><Edit2 size={16} /></button>
+                        <button className="action-btn delete" onClick={() => handleDelete(item.id)}><Trash2 size={16} /></button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
+              </section>
 
-              <button type="submit" className="btn-primary">
-                Salvar Compromisso
-              </button>
-            </form>
-          </section>
-
-          {/* 4. Lista de Compromissos */}
-          <section className="card list-section">
-            <div className="card-header">
-              <h2>Próximos Compromissos</h2>
-              <button className="btn-ghost" onClick={carregarCompromissos}>Atualizar</button>
-            </div>
-            <div className="list-container">
-              {compromissos.length === 0 ? (
-                <div className="empty-state">Nenhum compromisso agendado.</div>
-              ) : (
-                compromissos.map((item) => (
-                  <div key={item.id} className="list-item">
-                    <div className="item-icon">
-                      {getTypeIcon(item.tipo)}
-                    </div>
-                    <div className="item-content">
-                      <h3>{item.titulo}</h3>
-                      <span className="item-date">
-                        {new Date(item.dataHora).toLocaleString('pt-BR', {
-                          weekday: 'short',
-                          day: '2-digit',
-                          month: 'long',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </span>
-                    </div>
-                    <div className={`badge ${getBadgeClass(item.tipo)}`}>
-                      {item.tipo}
-                    </div>
-                    <div className="item-actions">
-                      <button className="btn-icon"><Edit2 size={16} /></button>
-                      <button className="btn-icon delete" onClick={() => handleDelete(item.id)}>
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
+              {/* Form (Simplified for Dashboard) */}
+              <section className="card form-section">
+                <div className="card-header"><h2>{editingId ? 'Editar' : 'Novo Rápido'}</h2></div>
+                <form onSubmit={handleSubmit} className="form-body">
+                  <div className="input-group">
+                    <label>Título</label>
+                    <input type="text" className="input-field" name="titulo" value={formData.titulo} onChange={handleInputChange} required />
                   </div>
-                ))
-              )}
+                  <div className="input-group">
+                    <label>Data</label>
+                    <input type="datetime-local" className="input-field" name="dataHora" value={formData.dataHora} onChange={handleInputChange} required />
+                  </div>
+                  <button type="submit" className="submit-btn"><Plus size={18} /> Salvar</button>
+                </form>
+              </section>
             </div>
-          </section>
-        </div>
+          </>
+        )}
+
+        {activeTab === 'kanban' && (
+          <div style={{ height: 'calc(100vh - 200px)' }}>
+            <KanbanView compromissos={compromissos} onUpdate={handleUpdateItem} />
+          </div>
+        )}
+
+        {activeTab === 'agenda' && (
+          <AgendaView compromissos={compromissos} />
+        )}
+
       </main>
     </div>
   );

@@ -1,0 +1,19 @@
+# Agent System
+.agent/
+
+# Dependencies
+node_modules/
+backend/target/
+frontend/dist/
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
