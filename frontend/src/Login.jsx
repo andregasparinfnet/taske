@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import axios from 'axios';
+import { login, register } from './api'; // SEC-005: Use API service
 import { User, Lock, LogIn, UserPlus, CheckCircle, AlertCircle } from 'lucide-react';
 import './Login.css';
 
@@ -18,12 +18,9 @@ function Login({ onLogin }) {
         setLoading(true);
 
         if (isRegistering) {
-            // REGISTRATION FLOW
+            // REGISTRATION FLOW (SEC-005)
             try {
-                await axios.post('http://localhost:8080/api/auth/register', {
-                    username,
-                    password
-                });
+                await register(username, password);
                 setSuccess('Conta criada com sucesso! Faça login agora.');
                 setIsRegistering(false); // Switch back to login
                 setPassword(''); // Clear password for security
@@ -38,21 +35,17 @@ function Login({ onLogin }) {
                 setLoading(false);
             }
         } else {
-            // LOGIN FLOW
+            // LOGIN FLOW (SEC-005: Token auto-refresh enabled)
             try {
-                const response = await axios.post('http://localhost:8080/api/auth/login', {
-                    username,
-                    password
-                });
-
-                // Extract Token
-                const { accessToken } = response.data;
-                const authData = { username, token: accessToken };
-
+                const authData = await login(username, password);
                 onLogin(authData);
             } catch (err) {
                 console.error("Login failed", err);
-                setError('Credenciais inválidas. Verifique usuário e senha.');
+                if (err.response?.status === 429) {
+                    setError('Muitas tentativas de login. Aguarde um minuto e tente novamente.');
+                } else {
+                    setError('Credenciais inválidas. Verifique usuário e senha.');
+                }
             } finally {
                 setLoading(false);
             }

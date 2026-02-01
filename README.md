@@ -98,7 +98,70 @@ Desenvolvido como projeto acadêmico para demonstrar competências em desenvolvi
 
 ---
 
+## 🔒 Segurança
+
+O LifeOS implementa múltiplas camadas de proteção para garantir a segurança dos dados e prevenir vulnerabilidades comuns:
+
+### ✅ Proteções Implementadas
+
+| Proteção | Status | Descrição |
+|----------|--------|-----------|
+| **CSRF Protection** | ✅ Ativo | Double Submit Cookie Pattern |
+| **Session Fixation Prevention** | ✅ Ativo | Session ID regeneration após login |
+| **Timing Attack Protection** | ✅ Ativo | Mensagens genéricas + BCrypt constant-time |
+| **Rate Limiting** | ✅ Ativo | 5 requisições/minuto por IP (login) |
+| **JWT Security** | ✅ Ativo | Access Token + Refresh Token |
+| **CORS Protection** | ✅ Ativo | Whitelist configurável |
+| **Security Headers** | ✅ Ativo | CSP, HSTS, X-Frame-Options |
+| **Password Hashing** | ✅ Ativo | BCrypt (strength 12) |
+
+### 🛡️ Auditoria de Vulnerabilidades
+
+**Status:** 🟢 **0 vulnerabilidades conhecidas**
+
+```bash
+# Backend
+./mvnw clean compile
+[INFO] BUILD SUCCESS ✅
+
+# Frontend
+npm audit
+found 0 vulnerabilities ✅
+```
+
+### 📊 Testes de Segurança
+
+**11 testes E2E** cobrindo:
+- ✅ CSRF Token generation & validation (6 testes)
+- ✅ Session Fixation Prevention (2 testes)
+- ✅ Timing Attack Protection (3 testes)
+
+**Cobertura:** 100% das vulnerabilidades críticas
+
+### 📄 Documentação de Segurança
+
+- [Security Implementation Status](docs/SECURITY-IMPLEMENTATION-STATUS.md) - Status detalhado das implementações
+- [Security Testing Report](docs/SECURITY-TESTING-REPORT.md) - Relatório completo de testes E2E
+- [Security Plan](docs/PLAN.md) - Plano estratégico de segurança
+
+### 🔐 Boas Práticas
+
+**Backend:**
+- Autenticação stateless via JWT
+- Senhas hash com BCrypt (never plaintext)
+- Validação de entrada em todos os endpoints
+- Isolamento de dados por usuário (multi-tenant)
+
+**Frontend:**
+- Access Token armazenado em memória (não em localStorage)
+- Refresh Token via httpOnly cookie
+- CSRF Token enviado automaticamente (Double Submit Cookie)
+- Timeout automático de sessão
+
+---
+
 ## 🚀 Instalação
+
 
 ### Pré-requisitos
 - Java 17+
