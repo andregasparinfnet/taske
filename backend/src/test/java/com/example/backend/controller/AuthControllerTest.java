@@ -28,6 +28,7 @@ import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -266,6 +267,7 @@ class AuthControllerTest {
 
         // Act & Assert
         mockMvc.perform(post("/api/auth/refresh")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isOk())
@@ -291,9 +293,10 @@ class AuthControllerTest {
 
         // Act & Assert
         mockMvc.perform(post("/api/auth/refresh")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
-                .andExpect(status().isInternalServerError()); // RuntimeException is thrown
+                .andExpect(status().isUnauthorized());
     }
 
     @Test
@@ -317,9 +320,10 @@ class AuthControllerTest {
 
         // Act & Assert
         mockMvc.perform(post("/api/auth/refresh")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
-                .andExpect(status().isInternalServerError());
+                .andExpect(status().isUnauthorized());
     }
 
     // ========== Logout Tests ==========
@@ -336,6 +340,7 @@ class AuthControllerTest {
 
         // Act & Assert
         mockMvc.perform(post("/api/auth/logout")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
                 .andExpect(status().isOk())

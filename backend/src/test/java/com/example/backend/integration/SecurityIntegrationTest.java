@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -95,6 +96,7 @@ class SecurityIntegrationTest {
         String refreshRequest = String.format("{\"refreshToken\":\"%s\"}", refreshToken);
 
         mockMvc.perform(post("/api/auth/refresh")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(refreshRequest))
                 .andExpect(status().isOk())
@@ -105,6 +107,7 @@ class SecurityIntegrationTest {
         String logoutRequest = String.format("{\"refreshToken\":\"%s\"}", refreshToken);
 
         mockMvc.perform(post("/api/auth/logout")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(logoutRequest))
                 .andExpect(status().isOk());
@@ -130,7 +133,7 @@ class SecurityIntegrationTest {
             mockMvc.perform(post("/api/auth/login")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(loginRequest)
-                    .header("X-Forwarded-For", "192.168.1.100"))
+                    .header("X-Forwarded-For", "192.168.1.201"))
                     .andExpect(status().isUnauthorized());
         }
 
@@ -138,7 +141,7 @@ class SecurityIntegrationTest {
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(loginRequest)
-                .header("X-Forwarded-For", "192.168.1.100"))
+                .header("X-Forwarded-For", "192.168.1.201"))
                 .andExpect(status().isTooManyRequests())
                 .andExpect(content().string(org.hamcrest.Matchers.containsString("Too many login attempts")));
     }
@@ -156,7 +159,7 @@ class SecurityIntegrationTest {
             mockMvc.perform(post("/api/auth/login")
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(loginRequest)
-                    .header("X-Forwarded-For", "192.168.1.100"))
+                    .header("X-Forwarded-For", "192.168.1.202"))
                     .andExpect(status().isUnauthorized());
         }
 
@@ -164,14 +167,14 @@ class SecurityIntegrationTest {
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(loginRequest)
-                .header("X-Forwarded-For", "192.168.1.100"))
+                .header("X-Forwarded-For", "192.168.1.202"))
                 .andExpect(status().isTooManyRequests());
 
         // IP2 should still be allowed
         mockMvc.perform(post("/api/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(loginRequest)
-                .header("X-Forwarded-For", "192.168.1.101"))
+                .header("X-Forwarded-For", "192.168.1.203"))
                 .andExpect(status().isUnauthorized()); // Not rate limited, just wrong password
     }
 
@@ -186,6 +189,7 @@ class SecurityIntegrationTest {
         );
 
         mockMvc.perform(post("/api/auth/login")
+                .secure(true) // Required for HSTS header
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(loginRequest))
                 .andExpect(status().isOk())
@@ -208,6 +212,7 @@ class SecurityIntegrationTest {
         );
 
         mockMvc.perform(post("/api/auth/login")
+                .header("X-Forwarded-For", "192.168.1.105") // Unique IP to avoid rate limit
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(loginRequest)
                 .header("Origin", "http://localhost:5173"))
@@ -226,6 +231,7 @@ class SecurityIntegrationTest {
         String invalidRefreshRequest = "{\"refreshToken\":\"invalid-token-12345\"}";
 
         mockMvc.perform(post("/api/auth/refresh")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(invalidRefreshRequest))
                 .andExpect(status().isUnauthorized())
@@ -256,12 +262,14 @@ class SecurityIntegrationTest {
         // Use refresh token once
         String refreshRequest = String.format("{\"refreshToken\":\"%s\"}", refreshToken);
         mockMvc.perform(post("/api/auth/refresh")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(refreshRequest))
                 .andExpect(status().isOk());
 
         // Try to use the same token again (should fail - token rotation)
         mockMvc.perform(post("/api/auth/refresh")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(refreshRequest))
                 .andExpect(status().isUnauthorized())
@@ -298,6 +306,7 @@ class SecurityIntegrationTest {
         String nullTokenRequest = "{\"refreshToken\":null}";
 
         mockMvc.perform(post("/api/auth/refresh")
+                .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(nullTokenRequest))
                 .andExpect(status().isUnauthorized());

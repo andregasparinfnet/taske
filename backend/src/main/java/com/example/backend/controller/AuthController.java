@@ -83,7 +83,7 @@ public class AuthController {
             String accessToken = tokenProvider.generateAccessToken(authentication);
             RefreshToken refreshToken = refreshTokenService.createRefreshToken(authentication.getName());
 
-            return ResponseEntity.ok(new JwtResponse(accessToken, refreshToken.getToken()));
+            return ResponseEntity.ok(new JwtResponse(accessToken, refreshToken.getToken(), authentication.getName()));
         } catch (Exception e) {
             // SEC-003: Return generic error message (don't reveal if user exists or password is wrong)
             // Timing is already protected by BCrypt's constant-time comparison
@@ -94,21 +94,20 @@ public class AuthController {
 
     @PostMapping("/refresh")
     public ResponseEntity<?> refreshToken(@RequestBody RefreshRequest refreshRequest) {
-        return refreshTokenService.findByToken(refreshRequest.getRefreshToken())
-                .map(refreshTokenService::verifyExpiration)
-                .map(refreshToken -> {
-                    // Marcar como usado (one-time use)
-                    refreshTokenService.markAsUsed(refreshToken);
+        try {
+            RefreshToken refreshToken = refreshTokenService.findByToken(refreshRequest.getRefreshToken())
+                    .orElseThrow(() -> new RuntimeException("Refresh token não encontrado!"));
+            
+            refreshTokenService.verifyExpiration(refreshToken);
+            refreshTokenService.markAsUsed(refreshToken);
 
-                    // Gerar novo access token
-                    String newAccessToken = tokenProvider.generateRefreshToken(refreshToken.getUsername());
+            String newAccessToken = tokenProvider.generateRefreshToken(refreshToken.getUsername());
+            RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(refreshToken.getUsername());
 
-                    // Criar novo refresh token
-                    RefreshToken newRefreshToken = refreshTokenService.createRefreshToken(refreshToken.getUsername());
-
-                    return ResponseEntity.ok(new JwtResponse(newAccessToken, newRefreshToken.getToken()));
-                })
-                .orElseThrow(() -> new RuntimeException("Refresh token não encontrado!"));
+            return ResponseEntity.ok(new JwtResponse(newAccessToken, newRefreshToken.getToken(), refreshToken.getUsername()));
+        } catch (RuntimeException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Invalid or expired refresh token");
+        }
     }
 
     @PostMapping("/logout")
@@ -165,15 +164,18 @@ public class AuthController {
     public static class JwtResponse {
         private final String accessToken;
         private final String refreshToken;
+        private final String username;
         private final String tokenType = "Bearer";
 
-        public JwtResponse(String accessToken, String refreshToken) {
+        public JwtResponse(String accessToken, String refreshToken, String username) {
             this.accessToken = accessToken;
             this.refreshToken = refreshToken;
+            this.username = username;
         }
 
         public String getAccessToken() { return accessToken; }
         public String getRefreshToken() { return refreshToken; }
+        public String getUsername() { return username; }
         public String getTokenType() { return tokenType; }
     }
 }

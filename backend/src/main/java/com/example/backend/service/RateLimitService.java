@@ -39,11 +39,12 @@ public class RateLimitService {
      * @return true if allowed, false if rate limit exceeded
      */
     public boolean tryConsume(String ip) {
-        Bucket bucket = resolveBucket(ip);
+        String key = (ip == null || ip.isEmpty()) ? "unknown" : ip;
+        Bucket bucket = resolveBucket(key);
         boolean consumed = bucket.tryConsume(1);
         
         if (!consumed) {
-            logger.warn("Rate limit exceeded for IP: {}", ip);
+            logger.warn("Rate limit exceeded for IP: {}", key);
         }
         
         return consumed;
@@ -53,7 +54,8 @@ public class RateLimitService {
      * Get or create bucket for IP address
      */
     private Bucket resolveBucket(String ip) {
-        return buckets.computeIfAbsent(ip, k -> createNewBucket());
+        String key = (ip == null || ip.isEmpty()) ? "unknown" : ip;
+        return buckets.computeIfAbsent(key, k -> createNewBucket());
     }
     
     /**

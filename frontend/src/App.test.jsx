@@ -1,8 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import axios from 'axios';
 import App from './App';
+import * as api from './api';
+
+// Mock api.js module
+vi.mock('./api', () => ({
+    login: vi.fn(),
+    register: vi.fn(),
+    logout: vi.fn(),
+    getCompromissos: vi.fn(),
+    createCompromisso: vi.fn(),
+    updateCompromisso: vi.fn(),
+    deleteCompromisso: vi.fn(),
+    setAccessToken: vi.fn(),
+    clearAuth: vi.fn()
+}));
 
 // Mock KanbanView para testar callback onUpdate
 vi.mock('./KanbanView', () => ({
@@ -39,13 +52,13 @@ describe('App Component', () => {
             username: 'usuario',
             token: 'jwt-token'
         }));
-        axios.get.mockResolvedValue({ data: compromissos });
+        api.getCompromissos.mockResolvedValue(compromissos);
     };
 
     it('deve fazer logout automático se API retornar 403', async () => {
         setupAuthenticatedUser();
         // Simular erro 403 na busca de compromissos
-        axios.get.mockRejectedValue({ response: { status: 403 } });
+        api.getCompromissos.mockRejectedValue({ response: { status: 403 } });
 
         render(<App />);
 
@@ -85,11 +98,12 @@ describe('App Component', () => {
     });
 
     it('deve realizar login completo via fluxo de UI', async () => {
-        // Mock de resposta de login
-        axios.post.mockResolvedValueOnce({
-            data: { accessToken: 'fake-jwt-token' }
+        // Mock de resposta de login via api.js
+        api.login.mockResolvedValueOnce({
+            username: 'admin',
+            token: 'fake-jwt-token'
         });
-        axios.get.mockResolvedValueOnce({ data: [] }); // carregarCompromissos
+        api.getCompromissos.mockResolvedValueOnce([]); // carregarCompromissos
 
         render(<App />);
 
@@ -99,7 +113,7 @@ describe('App Component', () => {
 
         await waitFor(() => {
             // Verifica se chamou carregarCompromissos (que é chamado pelo handleLogin)
-            expect(axios.get).toHaveBeenCalledWith('http://localhost:8080/api/compromissos');
+            expect(api.getCompromissos).toHaveBeenCalled();
             // Verifica se setou localStorage
             expect(window.localStorage.setItem).toHaveBeenCalledWith('auth', JSON.stringify({
                 username: 'admin',
@@ -120,7 +134,7 @@ describe('App Component', () => {
         render(<App />);
 
         await waitFor(() => {
-            expect(axios.get).toHaveBeenCalled();
+            expect(api.getCompromissos).toHaveBeenCalled();
         });
 
         const lifeOsElements = screen.getAllByText('LifeOS');
@@ -133,7 +147,7 @@ describe('App Component', () => {
         render(<App />);
 
         await waitFor(() => {
-            expect(axios.get).toHaveBeenCalled();
+            expect(api.getCompromissos).toHaveBeenCalled();
         });
 
         expect(screen.getByText('Sair')).toBeInTheDocument();
@@ -146,7 +160,7 @@ describe('App Component', () => {
         render(<App />);
 
         await waitFor(() => {
-            expect(axios.get).toHaveBeenCalled();
+            expect(api.getCompromissos).toHaveBeenCalled();
         });
 
         // Clicar em Sair (há mais de um, pegar o do sidebar)
@@ -168,7 +182,7 @@ describe('App Component', () => {
         render(<App />);
 
         await waitFor(() => {
-            expect(axios.get).toHaveBeenCalled();
+            expect(api.getCompromissos).toHaveBeenCalled();
         });
 
         const dashboardButton = screen.getByText('Dashboard');
@@ -182,7 +196,7 @@ describe('App Component', () => {
         render(<App />);
 
         await waitFor(() => {
-            expect(axios.get).toHaveBeenCalled();
+            expect(api.getCompromissos).toHaveBeenCalled();
         });
 
         const quadrosButton = screen.getByText('Quadros');
@@ -232,7 +246,7 @@ describe('App Component', () => {
 
     it('deve submeter formulário para criar novo compromisso', async () => {
         setupAuthenticatedUser();
-        axios.post.mockResolvedValue({ data: {} });
+        api.createCompromisso.mockResolvedValue({});
 
         render(<App />);
 
@@ -240,7 +254,7 @@ describe('App Component', () => {
         await userEvent.click(screen.getByText('Dashboard'));
 
         await waitFor(() => {
-            expect(axios.get).toHaveBeenCalled();
+            expect(api.getCompromissos).toHaveBeenCalled();
         });
 
         // Preencher formulário usando atributo name
@@ -257,8 +271,7 @@ describe('App Component', () => {
         await userEvent.click(submitButton);
 
         await waitFor(() => {
-            expect(axios.post).toHaveBeenCalledWith(
-                'http://localhost:8080/api/compromissos',
+            expect(api.createCompromisso).toHaveBeenCalledWith(
                 expect.objectContaining({ titulo: 'Novo Compromisso' })
             );
         });
@@ -266,7 +279,7 @@ describe('App Component', () => {
 
     it('deve lidar com erro ao salvar compromisso', async () => {
         setupAuthenticatedUser();
-        axios.post.mockRejectedValue(new Error('Erro de rede'));
+        api.createCompromisso.mockRejectedValue(new Error('Erro de rede'));
 
         render(<App />);
 
@@ -274,7 +287,7 @@ describe('App Component', () => {
         await userEvent.click(screen.getByText('Dashboard'));
 
         await waitFor(() => {
-            expect(axios.get).toHaveBeenCalled();
+            expect(api.getCompromissos).toHaveBeenCalled();
         });
 
         const tituloInput = document.querySelector('input[name="titulo"]');
@@ -288,7 +301,7 @@ describe('App Component', () => {
 
         // Verificar que o axios.post foi chamado (mesmo que tenha falhado)
         await waitFor(() => {
-            expect(axios.post).toHaveBeenCalled();
+            expect(api.createCompromisso).toHaveBeenCalled();
         });
     });
 
@@ -297,7 +310,7 @@ describe('App Component', () => {
             { id: 1, titulo: 'Para Deletar', tipo: 'TRABALHO', dataHora: '2026-02-01T10:00', status: 'PENDENTE', valor: 0 }
         ];
         setupAuthenticatedUser(mockCompromissos);
-        axios.delete.mockResolvedValue({});
+        api.deleteCompromisso.mockResolvedValue({});
 
         render(<App />);
 
@@ -323,7 +336,7 @@ describe('App Component', () => {
         await userEvent.click(confirmBtn);
 
         await waitFor(() => {
-            expect(axios.delete).toHaveBeenCalledWith('http://localhost:8080/api/compromissos/1');
+            expect(api.deleteCompromisso).toHaveBeenCalledWith(1);
         });
     });
 
@@ -332,7 +345,7 @@ describe('App Component', () => {
             { id: 1, titulo: 'Falha Delete', tipo: 'TRABALHO', dataHora: '2026-02-01T10:00', status: 'PENDENTE', valor: 0 }
         ];
         setupAuthenticatedUser(mockCompromissos);
-        axios.delete.mockRejectedValue(new Error('Erro ao deletar'));
+        api.deleteCompromisso.mockRejectedValue(new Error('Erro ao deletar'));
 
         render(<App />);
 
@@ -347,7 +360,7 @@ describe('App Component', () => {
         await userEvent.click(screen.getByText('Sim, excluir'));
 
         await waitFor(() => {
-            expect(axios.delete).toHaveBeenCalled();
+            expect(api.deleteCompromisso).toHaveBeenCalled();
             // Apenas verifica que o modal fechou ou que um toast de erro pode ter sido chamado
             // Como ShowToast é interno, verificamos se o item ainda está lá (ou se o erro foi logado)
             // Aqui assumimos que o modal fecha no final
@@ -360,8 +373,8 @@ describe('App Component', () => {
             { id: 1, titulo: 'Original', tipo: 'PERICIA', dataHora: '2026-02-01T10:00', status: 'PENDENTE', valor: 100, descricao: 'Teste' }
         ];
         setupAuthenticatedUser(mockCompromissos);
-        axios.put.mockResolvedValue({});
-        axios.get.mockResolvedValue({ data: mockCompromissos }); // Recarrega
+        api.updateCompromisso.mockResolvedValue({});
+        api.getCompromissos.mockResolvedValue(mockCompromissos); // Recarrega
 
         render(<App />);
 
@@ -386,8 +399,8 @@ describe('App Component', () => {
         await userEvent.click(submitBtn);
 
         await waitFor(() => {
-            expect(axios.put).toHaveBeenCalledWith(
-                'http://localhost:8080/api/compromissos/1',
+            expect(api.updateCompromisso).toHaveBeenCalledWith(
+                1,
                 expect.objectContaining({ titulo: 'Editado' })
             );
         });
@@ -496,7 +509,7 @@ describe('App Component', () => {
         setupAuthenticatedUser();
         render(<App />);
         // Simular um erro para gerar toast
-        axios.post.mockRejectedValueOnce(new Error('Fail'));
+        api.createCompromisso.mockRejectedValueOnce(new Error('Fail'));
 
         await userEvent.click(screen.getByText('Dashboard'));
         await userEvent.type(document.querySelector('input[name="titulo"]'), 'Erro Teste');
@@ -552,7 +565,7 @@ describe('App Component', () => {
         const forceBtn = screen.getByTestId('force-confirm-null');
         await userEvent.click(forceBtn);
 
-        expect(axios.delete).not.toHaveBeenCalled();
+        expect(api.deleteCompromisso).not.toHaveBeenCalled();
     });
 
     it('deve exibir erro ao falhar exclusão', async () => {
@@ -562,7 +575,7 @@ describe('App Component', () => {
         await userEvent.click(screen.getByText('Dashboard'));
         await userEvent.click(document.querySelector('.action-btn.delete'));
 
-        axios.delete.mockRejectedValueOnce(new Error('Delete Fail'));
+        api.deleteCompromisso.mockRejectedValueOnce(new Error('Delete Fail'));
 
         await userEvent.click(screen.getByText('Sim, excluir'));
 
@@ -574,8 +587,8 @@ describe('App Component', () => {
     it('deve realizar login com sucesso', async () => {
         // Iniciar deslogado
         window.localStorage.getItem.mockReturnValue(null);
-        axios.post.mockResolvedValue({ data: { username: 'user', token: 'token123' } });
-        axios.get.mockResolvedValue({ data: [] });
+        api.login.mockResolvedValue({ username: 'testuser', token: 'token123' });
+        api.getCompromissos.mockResolvedValue([]);
 
         render(<App />);
 
@@ -597,8 +610,8 @@ describe('App Component', () => {
 
     it('deve lidar com erro genérico na busca de compromissos', async () => {
         setupAuthenticatedUser();
-        axios.get.mockRejectedValue({ response: { status: 500 } });
+        api.getCompromissos.mockRejectedValue({ response: { status: 500 } });
         render(<App />);
-        await waitFor(() => expect(axios.get).toHaveBeenCalled());
+        await waitFor(() => expect(api.getCompromissos).toHaveBeenCalled());
     });
 });

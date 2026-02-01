@@ -2,6 +2,7 @@ package com.example.backend.config;
 
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import io.jsonwebtoken.security.SignatureException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -53,6 +54,7 @@ public class JwtTokenProvider {
                 .setSubject(username)
                 .setIssuer(jwtIssuer)  // SEC-008
                 .setAudience(jwtAudience)  // SEC-010
+                .setId(java.util.UUID.randomUUID().toString())
                 .setIssuedAt(now)
                 .setNotBefore(now)  // SEC-012: Token válido imediatamente
                 .setExpiration(expiryDate)  // SEC-011
@@ -70,6 +72,7 @@ public class JwtTokenProvider {
                 .setSubject(username)
                 .setIssuer(jwtIssuer)  // SEC-008
                 .setAudience(jwtAudience)  // SEC-010
+                .setId(java.util.UUID.randomUUID().toString())
                 .setIssuedAt(now)
                 .setNotBefore(now)  // SEC-012
                 .setExpiration(expiryDate)  // SEC-011
@@ -112,6 +115,9 @@ public class JwtTokenProvider {
                     .build()
                     .parseClaimsJws(authToken);
             return true;
+        } catch (SignatureException ex) {
+            // Assinatura inválida (segredo incorreto)
+            logger.error("Assinatura JWT inválida: {}", ex.getMessage());
         } catch (SecurityException ex) {
             logger.error("Assinatura JWT inválida: {}", ex.getMessage());
         } catch (MalformedJwtException ex) {
@@ -120,6 +126,9 @@ public class JwtTokenProvider {
             logger.warn("JWT expirado para usuário: {}", ex.getClaims().getSubject());
         } catch (UnsupportedJwtException ex) {
             logger.error("JWT não suportado: {}", ex.getMessage());
+        } catch (PrematureJwtException ex) {
+            // SEC-012: not-before no futuro
+            logger.warn("JWT não é válido ainda (nbf no futuro): {}", ex.getMessage());
         } catch (IllegalArgumentException ex) {
             logger.error("JWT claims string vazia: {}", ex.getMessage());
         } catch (IncorrectClaimException ex) {

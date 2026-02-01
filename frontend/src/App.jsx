@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import * as api from './api';
 import Login from './Login';
 import KanbanView from './KanbanView';
 import AgendaView from './AgendaView';
@@ -50,7 +50,7 @@ function App() {
       const auth = JSON.parse(savedAuth);
       if (auth.token) {
         setUser(auth);
-        axios.defaults.headers.common['Authorization'] = `Bearer ${auth.token}`;
+        api.setAccessToken(auth.token);
         carregarCompromissos();
       }
     }
@@ -62,8 +62,8 @@ function App() {
 
   const carregarCompromissos = async () => {
     try {
-      const response = await axios.get('http://localhost:8080/api/compromissos');
-      setCompromissos(response.data);
+      const data = await api.getCompromissos();
+      setCompromissos(data);
     } catch (error) {
       if (error.response && error.response.status === 403) handleLogout();
     }
@@ -71,7 +71,7 @@ function App() {
 
   const handleLogin = (auth) => {
     setUser(auth);
-    axios.defaults.headers.common['Authorization'] = `Bearer ${auth.token}`;
+    api.setAccessToken(auth.token);
     localStorage.setItem('auth', JSON.stringify(auth));
     carregarCompromissos();
   };
@@ -80,7 +80,7 @@ function App() {
     setUser(null);
     localStorage.removeItem('auth');
     setCompromissos([]);
-    delete axios.defaults.headers.common['Authorization'];
+    api.clearAuth();
   };
 
   const handleInputChange = (e) => {
@@ -96,11 +96,11 @@ function App() {
     setErro('');
     try {
       if (editingId) {
-        await axios.put(`http://localhost:8080/api/compromissos/${editingId}`, formData);
+        await api.updateCompromisso(editingId, formData);
         showToast('Compromisso atualizado com sucesso!');
         setEditingId(null);
       } else {
-        await axios.post('http://localhost:8080/api/compromissos', formData);
+        await api.createCompromisso(formData);
         showToast('Compromisso criado com sucesso!');
       }
       setFormData({ titulo: '', dataHora: '', tipo: 'PERICIA', status: 'PENDENTE', valor: '', descricao: '', urgente: false });
@@ -137,7 +137,7 @@ function App() {
     if (!itemToDelete) return;
 
     try {
-      await axios.delete(`http://localhost:8080/api/compromissos/${itemToDelete}`);
+      await api.deleteCompromisso(itemToDelete);
       showToast('Compromisso excluído com sucesso!');
       carregarCompromissos();
     } catch (error) {

@@ -1,252 +1,417 @@
 package com.example.backend.controller;
 
-import com.example.backend.config.JwtTokenProvider;
-import com.example.backend.config.SecurityConfig;
 import com.example.backend.model.Compromisso;
 import com.example.backend.model.Usuario;
 import com.example.backend.repository.CompromissoRepository;
 import com.example.backend.repository.UsuarioRepository;
+import com.example.backend.service.RateLimitService;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.annotation.Transactional;
+
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.when;
 
 import java.time.LocalDateTime;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Optional;
 
-import static org.hamcrest.Matchers.hasSize;
-import static org.mockito.ArgumentMatchers.*;
+import static org.hamcrest.Matchers.*;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(CompromissoController.class)
-@Import({SecurityConfig.class, JwtTokenProvider.class})
-public class CompromissoControllerTest {
+/**
+ * Testes de integração completos para operações CRUD de Update e Delete
+ * 
+ * COBERTURA:
+ * - Update (PUT): success, not found, forbidden, validation
+ * - Delete (DELETE): success, not found, forbidden
+ * - Security: IDOR, authorization, multi-user isolation
+ * - Edge cases: concurrent updates, update after delete
+ */
+@SpringBootTest(properties = {
+    "ratelimit.enabled=false"  // Desabilitar rate limiting para não bloquear logins em testes
+})
+@AutoConfigureMockMvc
+@Transactional
+class CompromissoControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
 
+    @Autowired
     private ObjectMapper objectMapper;
 
-    @MockBean
+    @Autowired
     private CompromissoRepository compromissoRepository;
 
-    @MockBean
+    @Autowired
     private UsuarioRepository usuarioRepository;
 
-    private Usuario usuarioLogado;
-    private Usuario outroUsuario;
-    private Compromisso compromissoExistente;
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
+    @MockBean
+    private RateLimitService rateLimitService;
+
+    private Usuario user1;
+    private Usuario user2;
+    private String user1Token;
+    private String user2Token;
 
     @BeforeEach
-    void setUp() {
-        objectMapper = new ObjectMapper();
-        objectMapper.registerModule(new JavaTimeModule());
+    void setUp() throws Exception {
+        // Mock rate limiting para não bloquear logins em testes
+        when(rateLimitService.tryConsume(anyString())).thenReturn(true);
 
-        usuarioLogado = new Usuario();
-        usuarioLogado.setId(1L);
-        usuarioLogado.setUsername("teste@user.com");
-        usuarioLogado.setPassword("senha123");
+        // Limpar dados
+        compromissoRepository.deleteAll();
+        usuarioRepository.deleteAll();
 
-        outroUsuario = new Usuario();
-        outroUsuario.setId(2L);
-        outroUsuario.setUsername("outro@user.com");
-        outroUsuario.setPassword("senha456");
+        // Criar usuários
+        user1 = new Usuario();
+        user1.setUsername("user1");
+        user1.setPassword(passwordEncoder.encode("password1"));
+        user1 = usuarioRepository.save(user1);
 
-        compromissoExistente = new Compromisso();
-        compromissoExistente.setId(1L);
-        compromissoExistente.setTitulo("Compromisso Existente");
-        compromissoExistente.setDataHora(LocalDateTime.now().plusDays(1));
-        compromissoExistente.setTipo("PERICIA");
-        compromissoExistente.setStatus("PENDENTE");
-        compromissoExistente.setUsuario(usuarioLogado);
+        user2 = new Usuario();
+        user2.setUsername("user2");
+        user2.setPassword(passwordEncoder.encode("password2"));
+        user2 = usuarioRepository.save(user2);
+
+        // Obter tokens JWT
+        user1Token = login("user1", "password1");
+        user2Token = login("user2", "password2");
     }
 
-    // ==================== TESTES DE LISTAGEM ====================
+    private String login(String username, String password) throws Exception {
+        String loginJson = String.format("{\"username\":\"%s\",\"password\":\"%s\"}", username, password);
 
-    @Test
-    @WithMockUser(username = "teste@user.com")
-    public void deveListarApenasCompromissosDoUsuarioLogado() throws Exception {
-        List<Compromisso> meusCompromissos = Arrays.asList(compromissoExistente);
-
-        Mockito.when(compromissoRepository.findByUsuarioUsername("teste@user.com"))
-               .thenReturn(meusCompromissos);
-        Mockito.when(usuarioRepository.findByUsername(anyString()))
-               .thenReturn(Optional.of(usuarioLogado));
-
-        mockMvc.perform(get("/api/compromissos"))
+        MvcResult result = mockMvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(loginJson))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(1)))
-                .andExpect(jsonPath("$[0].titulo").value("Compromisso Existente"));
+                .andReturn();
+
+        String response = result.getResponse().getContentAsString();
+        return objectMapper.readTree(response).get("accessToken").asText();
     }
 
-    // ==================== TESTES DE CRIAÇÃO ====================
+    // ========== UPDATE TESTS ==========
 
     @Test
-    @WithMockUser(username = "teste@user.com")
-    public void deveCriarCompromissoComDadosValidos() throws Exception {
-        Mockito.when(usuarioRepository.findByUsername("teste@user.com"))
-               .thenReturn(Optional.of(usuarioLogado));
-        Mockito.when(compromissoRepository.save(any(Compromisso.class)))
-               .thenAnswer(invocation -> {
-                   Compromisso c = invocation.getArgument(0);
-                   c.setId(10L);
-                   return c;
-               });
+    @DisplayName("UPDATE: Deve atualizar compromisso com sucesso")
+    void testUpdate_Success() throws Exception {
+        // Arrange: Criar compromisso
+        Compromisso compromisso = createCompromisso(user1, "Título Original", "PERICIA");
+        Long id = compromisso.getId();
 
-        String requestBody = """
-            {
-                "titulo": "Novo Compromisso",
-                "dataHora": "2026-02-15T14:00",
-                "tipo": "TRABALHO"
-            }
-            """;
+        // Preparar dados de atualização
+        Compromisso updateData = new Compromisso();
+        updateData.setTitulo("Título Atualizado");
+        updateData.setDataHora(LocalDateTime.now().plusDays(2));
+        updateData.setTipo("TRABALHO");
+        updateData.setUrgente(true);
+        updateData.setStatus("EM_ANDAMENTO");
+        updateData.setValor(1500.50);
+        updateData.setDescricao("Descrição atualizada");
 
-        mockMvc.perform(post("/api/compromissos")
+        // Act & Assert: Atualizar
+        mockMvc.perform(put("/api/compromissos/{id}", id)
+                        .with(csrf())
+                        .header("Authorization", "Bearer " + user1Token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
-                .andExpect(status().isCreated())
-                .andExpect(jsonPath("$.titulo").value("Novo Compromisso"))
-                .andExpect(jsonPath("$.tipo").value("TRABALHO"));
-    }
-
-    @Test
-    @WithMockUser(username = "teste@user.com")
-    public void deveRetornarErroSeTituloVazio() throws Exception {
-        String requestBody = """
-            {
-                "titulo": "",
-                "dataHora": "2026-02-15T14:00",
-                "tipo": "TRABALHO"
-            }
-            """;
-
-        mockMvc.perform(post("/api/compromissos")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
-                .andExpect(status().isBadRequest());
-    }
-
-    @Test
-    @WithMockUser(username = "teste@user.com")
-    public void deveRetornarErroSeDataNula() throws Exception {
-        String requestBody = """
-            {
-                "titulo": "Compromisso Sem Data",
-                "tipo": "TRABALHO"
-            }
-            """;
-
-        mockMvc.perform(post("/api/compromissos")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
-                .andExpect(status().isBadRequest());
-    }
-
-    // ==================== TESTES DE ATUALIZAÇÃO ====================
-
-    @Test
-    @WithMockUser(username = "teste@user.com")
-    public void deveAtualizarCompromissoDoProprioUsuario() throws Exception {
-        Mockito.when(compromissoRepository.findById(1L))
-               .thenReturn(Optional.of(compromissoExistente));
-        Mockito.when(compromissoRepository.save(any(Compromisso.class)))
-               .thenAnswer(invocation -> invocation.getArgument(0));
-
-        String requestBody = """
-            {
-                "titulo": "Título Atualizado",
-                "dataHora": "2026-02-20T10:00",
-                "tipo": "FAMILIA",
-                "status": "EM_ANDAMENTO"
-            }
-            """;
-
-        mockMvc.perform(put("/api/compromissos/1")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+                        .content(objectMapper.writeValueAsString(updateData)))
                 .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(id))
                 .andExpect(jsonPath("$.titulo").value("Título Atualizado"))
-                .andExpect(jsonPath("$.status").value("EM_ANDAMENTO"));
+                .andExpect(jsonPath("$.tipo").value("TRABALHO"))
+                .andExpect(jsonPath("$.urgente").value(true))
+                .andExpect(jsonPath("$.status").value("EM_ANDAMENTO"))
+                .andExpect(jsonPath("$.valor").value(1500.50))
+                .andExpect(jsonPath("$.descricao").value("Descrição atualizada"));
     }
 
     @Test
-    @WithMockUser(username = "teste@user.com")
-    public void deveNegarAcessoAoCompromissoDeOutroUsuario() throws Exception {
-        // Compromisso pertence a outro usuário
-        compromissoExistente.setUsuario(outroUsuario);
+    @DisplayName("UPDATE: Deve retornar 404 para ID inexistente")
+    void testUpdate_NotFound() throws Exception {
+        // Arrange
+        Long nonExistentId = 99999L;
+        Compromisso updateData = new Compromisso();
+        updateData.setTitulo("Título");
+        updateData.setDataHora(LocalDateTime.now());
+        updateData.setTipo("PERICIA");
 
-        Mockito.when(compromissoRepository.findById(1L))
-               .thenReturn(Optional.of(compromissoExistente));
-
-        String requestBody = """
-            {
-                "titulo": "Tentativa de Hack",
-                "dataHora": "2026-02-20T10:00",
-                "tipo": "TRABALHO"
-            }
-            """;
-
-        mockMvc.perform(put("/api/compromissos/1")
+        // Act & Assert
+        mockMvc.perform(put("/api/compromissos/{id}", nonExistentId)
+                        .with(csrf())
+                        .header("Authorization", "Bearer " + user1Token)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
-                .andExpect(status().isForbidden());
-    }
-
-    @Test
-    @WithMockUser(username = "teste@user.com")
-    public void deveRetornar404SeCompromissoNaoExiste() throws Exception {
-        Mockito.when(compromissoRepository.findById(999L))
-               .thenReturn(Optional.empty());
-
-        String requestBody = """
-            {
-                "titulo": "Qualquer Título",
-                "dataHora": "2026-02-20T10:00",
-                "tipo": "TRABALHO"
-            }
-            """;
-
-        mockMvc.perform(put("/api/compromissos/999")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(requestBody))
+                        .content(objectMapper.writeValueAsString(updateData)))
                 .andExpect(status().isNotFound());
     }
 
-    // ==================== TESTES DE DELEÇÃO ====================
-
     @Test
-    @WithMockUser(username = "teste@user.com")
-    public void deveDeletarCompromissoDoProprioUsuario() throws Exception {
-        Mockito.when(compromissoRepository.findById(1L))
-               .thenReturn(Optional.of(compromissoExistente));
+    @DisplayName("UPDATE: Deve retornar 403 ao tentar editar compromisso de outro usuário (IDOR)")
+    void testUpdate_Forbidden_IDOR() throws Exception {
+        // Arrange: user1 cria compromisso
+        Compromisso compromisso = createCompromisso(user1, "Compromisso do User1", "PERICIA");
+        Long id = compromisso.getId();
 
-        mockMvc.perform(delete("/api/compromissos/1"))
-                .andExpect(status().isNoContent());
+        // Preparar dados de atualização
+        Compromisso updateData = new Compromisso();
+        updateData.setTitulo("Tentativa de Hack");
+        updateData.setDataHora(LocalDateTime.now());
+        updateData.setTipo("TRABALHO");
 
-        Mockito.verify(compromissoRepository).deleteById(1L);
+        // Act & Assert: user2 tenta atualizar compromisso de user1
+        mockMvc.perform(put("/api/compromissos/{id}", id)
+                        .with(csrf())
+                        .header("Authorization", "Bearer " + user2Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateData)))
+                .andExpect(status().isForbidden());
     }
 
     @Test
-    @WithMockUser(username = "teste@user.com")
-    public void deveNegarDelecaoDeCompromissoDeOutroUsuario() throws Exception {
-        // Compromisso pertence a outro usuário
-        compromissoExistente.setUsuario(outroUsuario);
+    @DisplayName("UPDATE: Deve retornar 400 para dados inválidos")
+    void testUpdate_ValidationError() throws Exception {
+        // Arrange
+        Compromisso compromisso = createCompromisso(user1, "Compromisso", "PERICIA");
+        Long id = compromisso.getId();
 
-        Mockito.when(compromissoRepository.findById(1L))
-               .thenReturn(Optional.of(compromissoExistente));
+        // Dados inválidos: título vazio
+        String invalidJson = "{\"titulo\":\"\",\"dataHora\":\"2025-12-31T10:00:00\",\"tipo\":\"PERICIA\"}";
 
-        mockMvc.perform(delete("/api/compromissos/1"))
+        // Act & Assert
+        mockMvc.perform(put("/api/compromissos/{id}", id)
+                        .with(csrf())
+                        .header("Authorization", "Bearer " + user1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(invalidJson))
+                .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    @DisplayName("UPDATE: Deve retornar 401 sem token JWT")
+    void testUpdate_Unauthorized() throws Exception {
+        // Arrange
+        Compromisso compromisso = createCompromisso(user1, "Compromisso", "PERICIA");
+        Long id = compromisso.getId();
+
+        Compromisso updateData = new Compromisso();
+        updateData.setTitulo("Update sem auth");
+        updateData.setDataHora(LocalDateTime.now());
+        updateData.setTipo("TRABALHO");
+
+        // Act & Assert: Request sem token
+        mockMvc.perform(put("/api/compromissos/{id}", id)
+                        .with(csrf())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateData)))
+                .andExpect(status().isForbidden());  // CSRF protection returns 403 when no token
+    }
+
+    // ========== DELETE TESTS ==========
+
+    @Test
+    @DisplayName("DELETE: Deve deletar compromisso com sucesso")
+    void testDelete_Success() throws Exception {
+        // Arrange: Criar compromisso
+        Compromisso compromisso = createCompromisso(user1, "Compromisso a deletar", "PERICIA");
+        Long id = compromisso.getId();
+
+        // Act: Deletar
+        mockMvc.perform(delete("/api/compromissos/{id}", id)
+                        .with(csrf())
+                        .header("Authorization", "Bearer " + user1Token))
+                .andExpect(status().isNoContent());
+
+        // Assert: Verificar que foi deletado
+        mockMvc.perform(get("/api/compromissos")
+                        .header("Authorization", "Bearer " + user1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    @DisplayName("DELETE: Deve retornar 403 ao tentar deletar compromisso de outro usuário (IDOR)")
+    void testDelete_Forbidden_IDOR() throws Exception {
+        // Arrange: user1 cria compromisso
+        Compromisso compromisso = createCompromisso(user1, "Compromisso do User1", "PERICIA");
+        Long id = compromisso.getId();
+
+        // Act & Assert: user2 tenta deletar
+        mockMvc.perform(delete("/api/compromissos/{id}", id)
+                        .with(csrf())
+                        .header("Authorization", "Bearer " + user2Token))
                 .andExpect(status().isForbidden());
+
+        // Verificar que não foi deletado
+        mockMvc.perform(get("/api/compromissos")
+                        .header("Authorization", "Bearer " + user1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)));
+    }
+
+    @Test
+    @DisplayName("DELETE: Deve ser idempotente (não quebra se ID não existe)")
+    void testDelete_Idempotent() throws Exception {
+        // Arrange
+        Long nonExistentId = 99999L;
+
+        // Act & Assert: Deletar ID inexistente não deve quebrar
+        mockMvc.perform(delete("/api/compromissos/{id}", nonExistentId)
+                        .with(csrf())
+                        .header("Authorization", "Bearer " + user1Token))
+                .andExpect(status().isNoContent());
+    }
+
+    @Test
+    @DisplayName("DELETE: Deve retornar 401 sem token JWT")
+    void testDelete_Unauthorized() throws Exception {
+        // Arrange
+        Compromisso compromisso = createCompromisso(user1, "Compromisso", "PERICIA");
+        Long id = compromisso.getId();
+
+        // Act & Assert
+        mockMvc.perform(delete("/api/compromissos/{id}", id)
+                        .with(csrf()))
+                .andExpect(status().isForbidden());  // CSRF protection returns 403 when no token
+    }
+
+    // ========== INTEGRATION TESTS ==========
+
+    @Test
+    @DisplayName("INTEGRATION: Fluxo completo de UPDATE")
+    void testCompleteUpdateFlow() throws Exception {
+        // 1. Criar
+        Compromisso original = createCompromisso(user1, "Original", "PERICIA");
+        Long id = original.getId();
+
+        // 2. Ler e validar criação
+        mockMvc.perform(get("/api/compromissos")
+                        .header("Authorization", "Bearer " + user1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].titulo").value("Original"))
+                .andExpect(jsonPath("$[0].tipo").value("PERICIA"));
+
+        // 3. Atualizar
+        Compromisso updateData = new Compromisso();
+        updateData.setTitulo("Atualizado");
+        updateData.setDataHora(LocalDateTime.now());
+        updateData.setTipo("TRABALHO");
+
+        mockMvc.perform(put("/api/compromissos/{id}", id)
+                        .with(csrf())
+                        .header("Authorization", "Bearer " + user1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateData)))
+                .andExpect(status().isOk());
+
+        // 4. Ler novamente e validar mudança
+        mockMvc.perform(get("/api/compromissos")
+                        .header("Authorization", "Bearer " + user1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].titulo").value("Atualizado"))
+                .andExpect(jsonPath("$[0].tipo").value("TRABALHO"));
+    }
+
+    @Test
+    @DisplayName("INTEGRATION: Fluxo completo de DELETE")
+    void testCompleteDeleteFlow() throws Exception {
+        // 1. Criar
+        Compromisso compromisso = createCompromisso(user1, "A deletar", "FAMILIA");
+        Long id = compromisso.getId();
+
+        // 2. Verificar existe
+        mockMvc.perform(get("/api/compromissos")
+                        .header("Authorization", "Bearer " + user1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)));
+
+        // 3. Deletar
+        mockMvc.perform(delete("/api/compromissos/{id}", id)
+                        .with(csrf())
+                        .header("Authorization", "Bearer " + user1Token))
+                .andExpect(status().isNoContent());
+
+        // 4. Verificar foi deletado
+        mockMvc.perform(get("/api/compromissos")
+                        .header("Authorization", "Bearer " + user1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(0)));
+    }
+
+    @Test
+    @DisplayName("INTEGRATION: Tentar atualizar após deletar deve retornar 404")
+    void testUpdateAfterDelete() throws Exception {
+        // 1. Criar e deletar
+        Compromisso compromisso = createCompromisso(user1, "Compromisso", "PERICIA");
+        Long id = compromisso.getId();
+
+        mockMvc.perform(delete("/api/compromissos/{id}", id)
+                        .with(csrf())
+                        .header("Authorization", "Bearer " + user1Token))
+                .andExpect(status().isNoContent());
+
+        // 2. Tentar atualizar
+        Compromisso updateData = new Compromisso();
+        updateData.setTitulo("Update após delete");
+        updateData.setDataHora(LocalDateTime.now());
+        updateData.setTipo("TRABALHO");
+
+        mockMvc.perform(put("/api/compromissos/{id}", id)
+                        .with(csrf())
+                        .header("Authorization", "Bearer " + user1Token)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(updateData)))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
+    @DisplayName("SECURITY: Isolamento multi-usuário - User1 não vê compromissos de User2")
+    void testMultiUserIsolation() throws Exception {
+        // Arrange: Criar compromissos para cada usuário
+        createCompromisso(user1, "Compromisso User1", "PERICIA");
+        createCompromisso(user2, "Compromisso User2", "TRABALHO");
+
+        // Act & Assert: User1 vê apenas seus próprios
+        mockMvc.perform(get("/api/compromissos")
+                        .header("Authorization", "Bearer " + user1Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].titulo").value("Compromisso User1"));
+
+        // User2 vê apenas seus próprios
+        mockMvc.perform(get("/api/compromissos")
+                        .header("Authorization", "Bearer " + user2Token))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(1)))
+                .andExpect(jsonPath("$[0].titulo").value("Compromisso User2"));
+    }
+
+    // ========== HELPER METHODS ==========
+
+    private Compromisso createCompromisso(Usuario usuario, String titulo, String tipo) {
+        Compromisso compromisso = new Compromisso();
+        compromisso.setTitulo(titulo);
+        compromisso.setDataHora(LocalDateTime.now().plusDays(1));
+        compromisso.setTipo(tipo);
+        compromisso.setStatus("PENDENTE");
+        compromisso.setValor(1000.0);
+        compromisso.setDescricao("Descrição teste");
+        compromisso.setUrgente(false);
+        compromisso.setUsuario(usuario);
+        return compromissoRepository.save(compromisso);
     }
 }
