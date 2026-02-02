@@ -23,18 +23,16 @@ services:
           name: taske-db
           property: password
 
-  # 2. O Frontend (React) - Como Site Estático (Mais rápido e grátis)
-  - type: static
-    name: taske-frontend
+# 2. O Frontend (React) - Como Site Estático
+staticSites:
+  - name: taske-frontend
     context: ./frontend           # Aponta para a pasta do front
-    # SE USAR VITE: use 'npm run build' e publishDir 'dist'
-    # SE USAR CREATE-REACT-APP: use 'npm run build' e publishDir 'build'
     buildCommand: npm install && npm run build
     publishDir: dist 
     plan: free
     region: oregon
     envVars:
-      - key: VITE_API_URL         # Se usar Create-React-App mude para REACT_APP_API_URL
+      - key: VITE_API_URL
         fromService:
           type: web
           name: taske-backend
