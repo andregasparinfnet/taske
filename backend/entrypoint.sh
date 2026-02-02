@@ -1,20 +1,35 @@
 #!/bin/sh
 
-echo "--- ENTRYPOINT DEBUG ---"
-echo "Available Env Vars (Keys Only):"
-printenv | awk -F= '{print $1}' | sort
-echo "--- END DEBUG ---"
+echo "--- ENTRYPOINT CONFIGURATION ---"
 
-# If DB_HOST is explicitly set (e.g., from render.yaml), use the existing logic
-if [ -n "$DB_HOST" ]; then
-    echo "Using explicit env vars for DB connection..."
+# 1. Scenario: SPRING_DATASOURCE_URL is already set (Manually or via Render Environment)
+if [ -n "$SPRING_DATASOURCE_URL" ]; then
+    echo "Detected existing SPRING_DATASOURCE_URL."
+    
+    # Check if it starts with 'jdbc:'. If not, we fix it.
+    case "$SPRING_DATASOURCE_URL" in
+        jdbc:*) 
+            echo "URL is already in JDBC format."
+            ;;
+        *)
+            echo "Converting URL protocol to JDBC format..."
+            # Remove existing protocol (postgres:// or postgresql://)
+            CLEAN_URL=$(echo "$SPRING_DATASOURCE_URL" | sed -E 's|^[a-zA-Z]+://||')
+            # Prepend jdbc:postgresql://
+            export SPRING_DATASOURCE_URL="jdbc:postgresql://$CLEAN_URL"
+            ;;
+    esac
+
+# 2. Scenario: Granular Env Vars (DB_HOST, etc.) - Typically from Blueprint
+elif [ -n "$DB_HOST" ]; then
+    echo "Constructing URL from DB_HOST..."
     export SPRING_DATASOURCE_URL="jdbc:postgresql://${DB_HOST}:${DB_PORT:-5432}/${DB_NAME:-taske}"
-    
-# If DB_HOST is missing but DATABASE_URL is present (Render standard manual deploy), parse it
+
+# 3. Scenario: Standard Render DATABASE_URL (Auto-injected by Render)
 elif [ -n "$DATABASE_URL" ]; then
-    echo "DB_HOST missing, parsing DATABASE_URL..."
-    
+    echo "Parsing DATABASE_URL..."
     # Format: postgres://user:pass@host:port/dbname
+    
     # Remove protocol
     url_no_proto=${DATABASE_URL#*://}
     
@@ -26,27 +41,22 @@ elif [ -n "$DATABASE_URL" ]; then
     export DB_USER=${user_pass_part%:*}
     export DB_PASS=${user_pass_part#*:}
     
-    # Extract host:port and dbname
-    host_port=${host_db_part%/*}
-    export DB_NAME=${host_db_part#*/}
-    
-    # Extract host and port
-    export DB_HOST=${host_port%:*}
-    export DB_PORT=${host_port#*:}
-    
-    export SPRING_DATASOURCE_URL="jdbc:postgresql://${DB_HOST}:${DB_PORT}/${DB_NAME}"
+    # Set Spring Boot env vars for User/Pass
     export SPRING_DATASOURCE_USERNAME="${DB_USER}"
     export SPRING_DATASOURCE_PASSWORD="${DB_PASS}"
     
-    echo "Parsed DB config: Host=$DB_HOST, Port=$DB_PORT, DB=$DB_NAME"
+    # Construct JDBC URL with the host/db part
+    export SPRING_DATASOURCE_URL="jdbc:postgresql://$host_db_part"
+    
 else
-    echo "CRITICAL ERROR: No database configuration found!"
-    echo "This service needs either:"
-    echo "1. DB_* env vars (from render.yaml)"
-    echo "2. DATABASE_URL env var (from manual linking)"
-    echo "Defaulting to localhost (will fail)..."
+    echo "WARNING: No database configuration variables found!"
+    echo "Defaulting to localhost (likely to fail)."
     export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:${DB_PORT:-5432}/${DB_NAME:-taske}"
 fi
 
-# Run the application
+echo "Final Connection Info:"
+echo "URL: $SPRING_DATASOURCE_URL"
+echo "User: ${SPRING_DATASOURCE_USERNAME:-$(echo $DB_USER)}"
+
+echo "--- STARTING APPLICATION ---"
 exec java -Xmx350m -jar app.jar
