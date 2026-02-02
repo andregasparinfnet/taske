@@ -48,13 +48,11 @@ public class SecurityConfig {
             .cors(cors -> cors.configurationSource(corsConfigurationSource()))
             
             // SEC-001: CSRF Protection (HIGH priority)
-            // Double Submit Cookie Pattern para SPAs
-            .csrf(csrf -> csrf
-                .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
-                // Permitir endpoints de auth sem CSRF (login é idempotente)
-                .ignoringRequestMatchers("/api/auth/login", "/api/auth/register")
-            )
+            // SEC-001: CSRF Protection
+            // Disabled because we use stateless JWT in Headers (SEC-005).
+            // Frontend cannot read CSRF cookie from a different subdomain (Render restriction).
+            // Since we don't use session cookies for Auth, CSRF is not a threat.
+            .csrf(csrf -> csrf.disable())
             
             // SEC-002: Session Fixation Prevention (HIGH priority)
             // Regenera session ID após autenticação para prevenir session fixation
