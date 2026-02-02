@@ -1,5 +1,10 @@
 #!/bin/sh
 
+echo "--- ENTRYPOINT DEBUG ---"
+echo "Available Env Vars (Keys Only):"
+printenv | awk -F= '{print $1}' | sort
+echo "--- END DEBUG ---"
+
 # If DB_HOST is explicitly set (e.g., from render.yaml), use the existing logic
 if [ -n "$DB_HOST" ]; then
     echo "Using explicit env vars for DB connection..."
@@ -35,7 +40,11 @@ elif [ -n "$DATABASE_URL" ]; then
     
     echo "Parsed DB config: Host=$DB_HOST, Port=$DB_PORT, DB=$DB_NAME"
 else
-    echo "WARNING: Neither DB_HOST nor DATABASE_URL found. Defaulting to localhost (will likely fail on Render)."
+    echo "CRITICAL ERROR: No database configuration found!"
+    echo "This service needs either:"
+    echo "1. DB_* env vars (from render.yaml)"
+    echo "2. DATABASE_URL env var (from manual linking)"
+    echo "Defaulting to localhost (will fail)..."
     export SPRING_DATASOURCE_URL="jdbc:postgresql://localhost:${DB_PORT:-5432}/${DB_NAME:-taske}"
 fi
 
