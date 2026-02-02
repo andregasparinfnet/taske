@@ -3,7 +3,7 @@ services:
   - type: web
     name: taske-backend
     env: docker
-    rootDir: .                    # Contexto raiz para o Docker
+    rootDir: .
     dockerfilePath: ./backend/Dockerfile
     plan: free
     region: oregon
@@ -23,12 +23,13 @@ services:
           name: taske-db
           property: password
 
-# 2. O Frontend (React) - Como Site Estático (Melhor Performance/CDN)
-staticSites:
-  - name: taske-frontend
-    rootDir: ./frontend           # Diretório raiz do app React
+  # 2. O Frontend (React) - Configurado como Web Service Static
+  - type: web
+    name: taske-frontend
+    runtime: static             # Define que é um Site Estático
+    rootDir: ./frontend
     buildCommand: npm install && npm run build
-    publishPath: dist             # Pasta de saída do build (Vite = dist, CRA = build)
+    staticPublishPath: dist     # Pasta onde o Vite gera os arquivos
     plan: free
     region: oregon
     envVars:
