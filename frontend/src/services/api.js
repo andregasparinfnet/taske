@@ -10,7 +10,15 @@
 
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const getBaseUrl = () => {
+    let url = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+    if (!url.startsWith('http')) {
+        url = `https://${url}`;
+    }
+    return url;
+};
+
+const API_URL = getBaseUrl();
 const API_BASE_URL = `${API_URL}/api`;
 
 // In-memory access token (SEC-005: not in localStorage)

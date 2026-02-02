@@ -31,13 +31,13 @@ services:
     buildCommand: npm install && npm run build
     staticPublishPath: dist     # Pasta onde o Vite gera os arquivos
     plan: free
-    region: oregon
+    # region: removed (Static sites are global)
     envVars:
       - key: VITE_API_URL
         fromService:
           type: web
           name: taske-backend
-          property: url
+          property: host
 
 databases:
   # 3. O Banco de Dados
