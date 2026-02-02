@@ -13,4 +13,4 @@ WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080
 # LIMITADOR DE MEMÓRIA (Essencial para o Render Free):
-ENTRYPOINT ["java", "-Xmx350m", "-jar", "app.jar"]
+ENTRYPOINT ["/bin/sh", "-c", "export SPRING_DATASOURCE_URL=jdbc:postgresql://${DB_HOST:-localhost}:${DB_PORT:-5432}/${DB_NAME:-taske} && java -Xmx350m -jar app.jar"]
