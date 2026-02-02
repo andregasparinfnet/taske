@@ -1,0 +1,50 @@
+services:
+  # 1. O Backend (Spring Boot)
+  - type: web
+    name: taske-backend
+    env: docker
+    context: .                    # A raiz é a pasta 'taske'
+    dockerfilePath: ./backend/Dockerfile # Aponta para o arquivo dentro da pasta backend
+    plan: free
+    region: oregon
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: SPRING_DATASOURCE_URL
+        fromDatabase:
+          name: taske-db
+          property: connectionString
+      - key: SPRING_DATASOURCE_USERNAME
+        fromDatabase:
+          name: taske-db
+          property: user
+      - key: SPRING_DATASOURCE_PASSWORD
+        fromDatabase:
+          name: taske-db
+          property: password
+
+  # 2. O Frontend (React) - Como Site Estático (Mais rápido e grátis)
+  - type: static
+    name: taske-frontend
+    context: ./frontend           # Aponta para a pasta do front
+    # SE USAR VITE: use 'npm run build' e publishDir 'dist'
+    # SE USAR CREATE-REACT-APP: use 'npm run build' e publishDir 'build'
+    buildCommand: npm install && npm run build
+    publishDir: dist 
+    plan: free
+    region: oregon
+    envVars:
+      - key: VITE_API_URL         # Se usar Create-React-App mude para REACT_APP_API_URL
+        fromService:
+          type: web
+          name: taske-backend
+          property: url
+
+databases:
+  # 3. O Banco de Dados
+  - name: taske-db
+    databaseName: taske
+    user: taskeuser
+    plan: free
+    region: oregon
+    ipAllowList: [] # Segurança: só permite acesso interno (do backend)
