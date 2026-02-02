@@ -3,7 +3,7 @@ services:
   - type: web
     name: taske-backend
     env: docker
-    rootDir: .
+    rootDir: ./backend
     dockerfilePath: ./backend/Dockerfile
     plan: free
     region: oregon
