@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { login, register } from './api'; // SEC-005: Use API service
+import { login, register } from '../../services/api'; // SEC-005: Use API service
 import { User, Lock, LogIn, UserPlus, CheckCircle, AlertCircle } from 'lucide-react';
 import './Login.css';
 
@@ -13,8 +13,7 @@ function Login({ onLogin }) {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError('');
-        setSuccess('');
+        // Não limpar mensagens imediatamente; manter até nova resposta
         setLoading(true);
 
         if (isRegistering) {
@@ -22,6 +21,7 @@ function Login({ onLogin }) {
             try {
                 await register(username, password);
                 setSuccess('Conta criada com sucesso! Faça login agora.');
+                setError(''); // Limpa erro apenas no sucesso
                 setIsRegistering(false); // Switch back to login
                 setPassword(''); // Clear password for security
             } catch (err) {
@@ -39,6 +39,7 @@ function Login({ onLogin }) {
             try {
                 const authData = await login(username, password);
                 onLogin(authData);
+                setError(''); // Limpa erro apenas no sucesso
             } catch (err) {
                 console.error("Login failed", err);
                 if (err.response?.status === 429) {

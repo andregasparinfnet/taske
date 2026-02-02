@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import axios from 'axios';
+import { updateCompromisso } from '../../services/api';
 import KanbanView from './KanbanView';
+
+// Mock do serviço de API
+vi.mock('../../services/api', () => ({
+    updateCompromisso: vi.fn()
+}));
 
 // Mock do DragDropContext para simular eventos de drag
 vi.mock('@hello-pangea/dnd', async () => {
@@ -115,8 +120,8 @@ describe('KanbanView Component', () => {
 
     // ==================== TESTES DE DRAG AND DROP ====================
 
-    it('deve chamar onUpdate ao mover card para outra coluna', async () => {
-        axios.put.mockResolvedValue({});
+    it('deve chamar onUpdate al mover card para outra coluna', async () => {
+        updateCompromisso.mockResolvedValue({});
 
         render(<KanbanView compromissos={mockCompromissos} onUpdate={mockOnUpdate} />);
 
@@ -141,8 +146,8 @@ describe('KanbanView Component', () => {
             );
         });
 
-        expect(axios.put).toHaveBeenCalledWith(
-            'http://localhost:8080/api/compromissos/1',
+        expect(updateCompromisso).toHaveBeenCalledWith(
+            '1',
             expect.objectContaining({ status: 'EM_ANDAMENTO' })
         );
     });
@@ -181,7 +186,7 @@ describe('KanbanView Component', () => {
 
     it('deve tratar erro na API ao mover card', async () => {
         const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => { });
-        axios.put.mockRejectedValue(new Error('Erro de rede'));
+        updateCompromisso.mockRejectedValue(new Error('Erro de rede'));
 
         render(<KanbanView compromissos={mockCompromissos} onUpdate={mockOnUpdate} />);
 

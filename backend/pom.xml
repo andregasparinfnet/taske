@@ -10,7 +10,7 @@
     </parent>
     <groupId>com.lifeos</groupId>
     <artifactId>lifeos-backend</artifactId>
-    <version>1.0.0-beta.1</version>
+    <version>1.0.0-rc.1</version>
     <name>LifeOS Backend</name>
     <description>Sistema de Gestão Pessoal - API REST com Spring Boot, JWT Authentication e PostgreSQL</description>
     <licenses>
@@ -96,6 +96,11 @@
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
             <scope>test</scope>
         </dependency>
     </dependencies>

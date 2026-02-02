@@ -28,7 +28,7 @@ import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -340,11 +340,11 @@ class AuthControllerTest {
 
         // Act & Assert
         mockMvc.perform(post("/api/auth/logout")
+                .with(user(TEST_USERNAME))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(requestBody))
-                .andExpect(status().isOk())
-                .andExpect(content().string(org.hamcrest.Matchers.containsString("sucesso")));
+                .andExpect(status().isNoContent());
 
         verify(refreshTokenService).revokeAllUserTokens(TEST_USERNAME);
     }

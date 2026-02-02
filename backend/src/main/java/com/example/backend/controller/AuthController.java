@@ -6,7 +6,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.web.authentication.session.CompositeSessionAuthenticationStrategy;
 import org.springframework.web.bind.annotation.*;
 
 import com.example.backend.config.JwtTokenProvider;
@@ -16,7 +19,10 @@ import com.example.backend.repository.UsuarioRepository;
 import com.example.backend.service.RefreshTokenService;
 import com.example.backend.service.RateLimitService;
 
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import jakarta.servlet.http.HttpSession;
 
 import jakarta.validation.Valid;
 
@@ -42,8 +48,14 @@ public class AuthController {
     @Autowired
     private RateLimitService rateLimitService;
 
+    @Autowired
+    private CompositeSessionAuthenticationStrategy sessionAuthenticationStrategy;
+
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody @Valid Usuario usuario) {
+        // Enforce lowercase username
+        usuario.setUsername(usuario.getUsername().toLowerCase());
+
         if (usuarioRepository.existsByUsername(usuario.getUsername())) {
             return ResponseEntity.badRequest().body("Erro: Nome de usuário já existe!");
         }
@@ -62,7 +74,12 @@ public class AuthController {
      * response time doesn't leak information about valid usernames.
      */
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest, HttpServletRequest request) {
+    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest, HttpServletRequest request, HttpServletResponse response) {
+        // Enforce lowercase username
+        if (loginRequest.getUsername() != null) {
+            loginRequest.setUsername(loginRequest.getUsername().toLowerCase());
+        }
+
         // SEC-006: Rate limiting - extract client IP
         String clientIp = getClientIp(request);
         
@@ -73,12 +90,33 @@ public class AuthController {
         }
         
         try {
+            // 2. Limpar qualquer autenticação anterior no contexto
+            SecurityContextHolder.clearContext();
+
             // SEC-003: Authenticate with constant-time behavior
             // Spring Security's BCryptPasswordEncoder already uses constant-time comparison
             // but we ensure the auth manager is always invoked (even for non-existent users)
             Authentication authentication = authenticationManager.authenticate(
                     new UsernamePasswordAuthenticationToken(loginRequest.getUsername(), loginRequest.getPassword())
             );
+
+            // SEC-002: Invoke Session Strategy (Concurrency + Fixation + Register)
+            // This handles:
+            // 1. Session Fixation Protection (New Session)
+            // 2. Concurrent Session Control (Max Sessions)
+            // 3. Session Registration (for tracking)
+            sessionAuthenticationStrategy.onAuthentication(authentication, request, response);
+            
+            // Set context manually (important for session tracking)
+            SecurityContext context = SecurityContextHolder.createEmptyContext();
+            context.setAuthentication(authentication);
+            SecurityContextHolder.setContext(context);
+            
+            // Save context to session
+            HttpSession session = request.getSession(false);
+            if (session != null) {
+                session.setAttribute("SPRING_SECURITY_CONTEXT", context);
+            }
 
             String accessToken = tokenProvider.generateAccessToken(authentication);
             RefreshToken refreshToken = refreshTokenService.createRefreshToken(authentication.getName());
@@ -111,9 +149,26 @@ public class AuthController {
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(@RequestBody LogoutRequest logoutRequest) {
-        refreshTokenService.revokeAllUserTokens(logoutRequest.getUsername());
-        return ResponseEntity.ok("Logout realizado com sucesso!");
+    public ResponseEntity<Void> logout(HttpServletRequest request, HttpServletResponse response, Authentication authentication) {
+        // Revogar tokens no banco (invalidate server-side)
+        if (authentication != null && authentication.getName() != null) {
+            refreshTokenService.revokeAllUserTokens(authentication.getName());
+        }
+        
+        // Limpar Cookies de Segurança no Navegador
+        Cookie cookie = new Cookie("refreshToken", null);
+        cookie.setHttpOnly(true);
+        cookie.setSecure(true);
+        cookie.setPath("/api/auth/refresh");
+        cookie.setMaxAge(0); // Expira imediatamente
+        response.addCookie(cookie);
+
+        Cookie xsrf = new Cookie("XSRF-TOKEN", null);
+        xsrf.setPath("/");
+        xsrf.setMaxAge(0);
+        response.addCookie(xsrf);
+
+        return ResponseEntity.noContent().build();
     }
 
     // DTOs

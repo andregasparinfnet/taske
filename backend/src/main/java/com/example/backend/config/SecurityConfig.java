@@ -62,7 +62,7 @@ public class SecurityConfig {
                 // JWT é stateless, mas mantemos mínimo de session para CSRF
                 .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED)
                 // Prevenir session fixation - regenerar ID após login
-                .sessionFixation().changeSessionId()
+                .sessionFixation().newSession()
                 // Limite de sessões simultâneas por usuário
                 .maximumSessions(1)
                     .expiredUrl("/api/auth/session-expired")
@@ -133,6 +133,31 @@ public class SecurityConfig {
     }
 
     
+    @Bean
+    public org.springframework.security.core.session.SessionRegistry sessionRegistry() {
+        return new org.springframework.security.core.session.SessionRegistryImpl();
+    }
+
+    @Bean
+    public org.springframework.security.web.authentication.session.CompositeSessionAuthenticationStrategy sessionAuthenticationStrategy() {
+        org.springframework.security.web.authentication.session.ConcurrentSessionControlAuthenticationStrategy concurrentAuthenticationStrategy = 
+            new org.springframework.security.web.authentication.session.ConcurrentSessionControlAuthenticationStrategy(sessionRegistry());
+        concurrentAuthenticationStrategy.setMaximumSessions(1);
+        concurrentAuthenticationStrategy.setExceptionIfMaximumExceeded(false);
+        
+        org.springframework.security.web.authentication.session.SessionFixationProtectionStrategy sessionFixationProtectionStrategy = 
+            new org.springframework.security.web.authentication.session.SessionFixationProtectionStrategy();
+        
+        org.springframework.security.web.authentication.session.RegisterSessionAuthenticationStrategy registerSessionAuthenticationStrategy = 
+            new org.springframework.security.web.authentication.session.RegisterSessionAuthenticationStrategy(sessionRegistry());
+        
+        return new org.springframework.security.web.authentication.session.CompositeSessionAuthenticationStrategy(java.util.Arrays.asList(
+            concurrentAuthenticationStrategy,
+            sessionFixationProtectionStrategy, 
+            registerSessionAuthenticationStrategy
+        ));
+    }
+
     /**
      * SEC-009: CORS Hardening
      * 

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { Calendar, Briefcase, Users, DollarSign, Gavel, BookOpen, MoreHorizontal, AlertTriangle } from 'lucide-react';
-import axios from 'axios';
+import { updateCompromisso } from '../../services/api';
 
 const KanbanView = ({ compromissos, onUpdate }) => {
     const [columns, setColumns] = useState({
@@ -27,7 +27,7 @@ const KanbanView = ({ compromissos, onUpdate }) => {
 
         // Call API
         try {
-            await axios.put(`http://localhost:8080/api/compromissos/${draggableId}`, {
+            await updateCompromisso(draggableId, {
                 ...item,
                 status: newStatus
             });

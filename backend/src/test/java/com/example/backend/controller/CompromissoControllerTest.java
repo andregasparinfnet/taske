@@ -2,10 +2,12 @@ package com.example.backend.controller;
 
 import com.example.backend.model.Compromisso;
 import com.example.backend.model.Usuario;
+import com.example.backend.dto.CompromissoRequestDTO;
 import com.example.backend.repository.CompromissoRepository;
 import com.example.backend.repository.UsuarioRepository;
 import com.example.backend.service.RateLimitService;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -116,13 +118,14 @@ class CompromissoControllerTest {
         Long id = compromisso.getId();
 
         // Preparar dados de atualização
-        Compromisso updateData = new Compromisso();
+        // Preparar dados de atualização
+        CompromissoRequestDTO updateData = new CompromissoRequestDTO();
         updateData.setTitulo("Título Atualizado");
         updateData.setDataHora(LocalDateTime.now().plusDays(2));
-        updateData.setTipo("TRABALHO");
+        updateData.setTipo(com.example.backend.model.CompromissoTipo.TRABALHO);
         updateData.setUrgente(true);
-        updateData.setStatus("EM_ANDAMENTO");
-        updateData.setValor(1500.50);
+        updateData.setStatus(com.example.backend.model.CompromissoStatus.EM_ANDAMENTO);
+        updateData.setValor(java.math.BigDecimal.valueOf(1500.50));
         updateData.setDescricao("Descrição atualizada");
 
         // Act & Assert: Atualizar
@@ -146,10 +149,12 @@ class CompromissoControllerTest {
     void testUpdate_NotFound() throws Exception {
         // Arrange
         Long nonExistentId = 99999L;
-        Compromisso updateData = new Compromisso();
+        CompromissoRequestDTO updateData = new CompromissoRequestDTO();
         updateData.setTitulo("Título");
-        updateData.setDataHora(LocalDateTime.now());
-        updateData.setTipo("PERICIA");
+        updateData.setDataHora(LocalDateTime.now().plusHours(1));
+        updateData.setTipo(com.example.backend.model.CompromissoTipo.OUTROS);
+        updateData.setStatus(com.example.backend.model.CompromissoStatus.PENDENTE);
+        updateData.setValor(java.math.BigDecimal.TEN);
 
         // Act & Assert
         mockMvc.perform(put("/api/compromissos/{id}", nonExistentId)
@@ -168,10 +173,12 @@ class CompromissoControllerTest {
         Long id = compromisso.getId();
 
         // Preparar dados de atualização
-        Compromisso updateData = new Compromisso();
+        CompromissoRequestDTO updateData = new CompromissoRequestDTO();
         updateData.setTitulo("Tentativa de Hack");
-        updateData.setDataHora(LocalDateTime.now());
-        updateData.setTipo("TRABALHO");
+        updateData.setDataHora(LocalDateTime.now().plusHours(1));
+        updateData.setTipo(com.example.backend.model.CompromissoTipo.TRABALHO);
+        updateData.setStatus(com.example.backend.model.CompromissoStatus.PENDENTE);
+        updateData.setValor(java.math.BigDecimal.TEN);
 
         // Act & Assert: user2 tenta atualizar compromisso de user1
         mockMvc.perform(put("/api/compromissos/{id}", id)
@@ -208,10 +215,12 @@ class CompromissoControllerTest {
         Compromisso compromisso = createCompromisso(user1, "Compromisso", "PERICIA");
         Long id = compromisso.getId();
 
-        Compromisso updateData = new Compromisso();
+        CompromissoRequestDTO updateData = new CompromissoRequestDTO();
         updateData.setTitulo("Update sem auth");
-        updateData.setDataHora(LocalDateTime.now());
-        updateData.setTipo("TRABALHO");
+        updateData.setDataHora(LocalDateTime.now().plusHours(1));
+        updateData.setTipo(com.example.backend.model.CompromissoTipo.TRABALHO);
+        updateData.setStatus(com.example.backend.model.CompromissoStatus.PENDENTE);
+        updateData.setValor(java.math.BigDecimal.TEN);
 
         // Act & Assert: Request sem token
         mockMvc.perform(put("/api/compromissos/{id}", id)
@@ -306,10 +315,12 @@ class CompromissoControllerTest {
                 .andExpect(jsonPath("$[0].tipo").value("PERICIA"));
 
         // 3. Atualizar
-        Compromisso updateData = new Compromisso();
+        CompromissoRequestDTO updateData = new CompromissoRequestDTO();
         updateData.setTitulo("Atualizado");
-        updateData.setDataHora(LocalDateTime.now());
-        updateData.setTipo("TRABALHO");
+        updateData.setDataHora(LocalDateTime.now().plusHours(1));
+        updateData.setTipo(com.example.backend.model.CompromissoTipo.TRABALHO);
+        updateData.setStatus(com.example.backend.model.CompromissoStatus.PENDENTE);
+        updateData.setValor(java.math.BigDecimal.TEN);
 
         mockMvc.perform(put("/api/compromissos/{id}", id)
                         .with(csrf())
@@ -365,10 +376,13 @@ class CompromissoControllerTest {
                 .andExpect(status().isNoContent());
 
         // 2. Tentar atualizar
-        Compromisso updateData = new Compromisso();
+        // 2. Tentar atualizar
+        CompromissoRequestDTO updateData = new CompromissoRequestDTO();
         updateData.setTitulo("Update após delete");
-        updateData.setDataHora(LocalDateTime.now());
-        updateData.setTipo("TRABALHO");
+        updateData.setDataHora(LocalDateTime.now().plusHours(1));
+        updateData.setTipo(com.example.backend.model.CompromissoTipo.TRABALHO);
+        updateData.setStatus(com.example.backend.model.CompromissoStatus.PENDENTE);
+        updateData.setValor(java.math.BigDecimal.TEN);
 
         mockMvc.perform(put("/api/compromissos/{id}", id)
                         .with(csrf())

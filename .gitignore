@@ -1,13 +1,11 @@
 # Agent System
 .agent/
+.qodo/
 
 # Dependencies
 node_modules/
 backend/target/
 frontend/dist/
-
-#DOCS
-docs/
 
 # IDEs
 .idea/

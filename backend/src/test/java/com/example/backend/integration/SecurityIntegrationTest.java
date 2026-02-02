@@ -31,6 +31,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest
 @AutoConfigureMockMvc
 @Transactional
+@org.springframework.test.context.TestPropertySource(properties = "rate.limit.capacity=5")
 @DisplayName("Security Integration Tests")
 class SecurityIntegrationTest {
 
@@ -88,6 +89,7 @@ class SecurityIntegrationTest {
 
         String responseBody = loginResult.getResponse().getContentAsString();
         Map<String, Object> loginResponse = objectMapper.readValue(responseBody, Map.class);
+        String accessToken = (String) loginResponse.get("accessToken");
         String refreshToken = (String) loginResponse.get("refreshToken");
 
         assertNotNull(refreshToken, "SEC-001: Refresh token should be generated");
@@ -108,9 +110,10 @@ class SecurityIntegrationTest {
 
         mockMvc.perform(post("/api/auth/logout")
                 .with(csrf())
+                .header("Authorization", "Bearer " + accessToken)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(logoutRequest))
-                .andExpect(status().isOk());
+                .andExpect(status().isNoContent());
 
         // Verify token was revoked (SEC-003)
         assertTrue(refreshTokenRepository.findByToken(refreshToken).isEmpty() ||

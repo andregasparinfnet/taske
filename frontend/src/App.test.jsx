@@ -2,10 +2,10 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import App from './App';
-import * as api from './api';
+import * as api from './services/api';
 
 // Mock api.js module
-vi.mock('./api', () => ({
+vi.mock('./services/api', () => ({
     login: vi.fn(),
     register: vi.fn(),
     logout: vi.fn(),
@@ -18,7 +18,7 @@ vi.mock('./api', () => ({
 }));
 
 // Mock KanbanView para testar callback onUpdate
-vi.mock('./KanbanView', () => ({
+vi.mock('./views/Kanban/KanbanView', () => ({
     default: ({ onUpdate }) => (
         <div data-testid="kanban-view">
             <button onClick={() => onUpdate({ id: 99, titulo: 'Updated by Kanban', status: 'EM_ANDAMENTO' })}>
@@ -28,7 +28,7 @@ vi.mock('./KanbanView', () => ({
     )
 }));
 
-vi.mock('./ConfirmModal', () => ({
+vi.mock('./components/ConfirmModal/ConfirmModal', () => ({
     default: ({ isOpen, onConfirm, onClose, title }) => isOpen ? (
         <div data-testid="confirm-modal">
             <h2>{title || 'Excluir Compromisso'}</h2>

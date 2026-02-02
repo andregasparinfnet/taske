@@ -71,8 +71,13 @@ apiClient.interceptors.response.use(
     async (error) => {
         const originalRequest = error.config;
 
-        // SEC-005: If 401 and not already retrying, attempt token refresh
-        if (error.response?.status === 401 && !originalRequest._retry) {
+        // SEC-005: If 401 and not already retrying, and NOT a login/register request
+        // We don't want to try to refresh token if we are already trying to authenticate
+        const isAuthRequest = originalRequest.url.includes('/auth/login') ||
+            originalRequest.url.includes('/auth/register') ||
+            originalRequest.url.includes('/auth/refresh');
+
+        if (error.response?.status === 401 && !originalRequest._retry && !isAuthRequest) {
             originalRequest._retry = true;
 
             try {

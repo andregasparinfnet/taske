@@ -5,6 +5,18 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [1.0.0-rc.1] - 2026-02-01
+
+### 🚀 Release Candidate
+
+Versão candidata a lançamento com estrutura de frontend refatorada e testes validados.
+
+### 🔧 Alterado
+- Refatoração da estrutura de pastas do frontend (`views`, `components`, `services`).
+- Centralização da lógica de API em `src/services/api.js`.
+- Atualização de todos os caminhos de importação e mocks de teste.
+- Sincronização de versões entre Frontend e Backend.
+
 ## [1.0.0-beta.1] - 2026-01-31
 
 ### 🚧 Versão Beta
@@ -17,7 +29,8 @@ Primeira versão estável do LifeOS Frontend - Interface React para sistema de g
 - Tela de login com validação de campos
 - Tela de registro de novos usuários
 - Alternância fluida entre login e registro
-- Armazenamento seguro de token JWT no localStorage
+- Armazenamento seguro de token JWT em memória
+- Refresh Token via httpOnly cookie
 - Logout com limpeza de sessão
 
 #### Dashboard
@@ -55,27 +68,28 @@ Primeira versão estável do LifeOS Frontend - Interface React para sistema de g
 
 ### ✅ Testado
 
-#### Cobertura de Testes (98.01%)
-- 44 testes unitários passando
+#### Cobertura de Testes (90.58%)
+- 123 testes passando
 - Framework: Vitest + Testing Library
 
 | Componente | Statements | Branches | Functions |
 |------------|------------|----------|-----------|
-| App.jsx | 94.52% | 81.25% | 80.00% |
-| Login.jsx | 98.42% | 94.11% | 100% |
+| App.jsx | 100% | 98.57% | 100% |
+| Login.jsx | 97.43% | 97.22% | 100% |
 | DashboardView.jsx | 100% | 100% | 100% |
-| AgendaView.jsx | 100% | 91.66% | 100% |
-| KanbanView.jsx | 93.16% | 87.50% | 83.33% |
+| AgendaView.jsx | 78.87% | 95.00% | 94.11% |
+| KanbanView.jsx | 100% | 100% | 100% |
 
 #### Cenários Testados
 - Renderização de componentes
-- Fluxo de autenticação (login/logout)
+- Fluxo de autenticação (login/logout/refresh)
 - Navegação entre abas
 - Criação e edição de compromissos
 - Exclusão com confirmação
 - Drag and drop no Kanban
 - Tratamento de erros de API
 - Estados vazios e edge cases
+- Interceptors de API e segurança
 
 ### 🔧 Configuração
 
@@ -95,14 +109,14 @@ VITE_API_URL=http://localhost:8080
 ```
 
 ### 📦 Dependências Principais
-- React 19.2.0
-- React DOM 19.2.0
-- React Router DOM 7.13.0
-- Axios 1.13.2
-- @hello-pangea/dnd 18.0.1
-- Lucide React 0.562.0
-- Vite 7.2.4
-- Vitest 2.0.0
+- React 19.x
+- React DOM 19.x
+- React Router DOM 7.x
+- Axios 1.x
+- @hello-pangea/dnd 18.x
+- Lucide React 0.56.x
+- Vite 7.x
+- Vitest 2.x
 - Testing Library (React, Jest-DOM, User-Event)
 
 ### 🐛 Corrigido
@@ -110,6 +124,7 @@ VITE_API_URL=http://localhost:8080
 - Warnings de `act()` nos testes de componentes assíncronos
 - Seletores de elementos em testes de formulário
 - Exclusão de arquivos de configuração do relatório de cobertura
+- Correção na lógica de retry do interceptor de refresh token
 
 ---
 
@@ -125,5 +140,6 @@ VITE_API_URL=http://localhost:8080
 
 ---
 
+[1.0.0-rc.1]: https://github.com/seu-usuario/lifeos/releases/tag/v1.0.0-rc.1-frontend
 [1.0.0-beta.1]: https://github.com/seu-usuario/lifeos/releases/tag/v1.0.0-beta.1-frontend
-[Unreleased]: https://github.com/seu-usuario/lifeos/compare/v1.0.0-beta.1-frontend...HEAD
+[Unreleased]: https://github.com/seu-usuario/lifeos/compare/v1.0.0-rc.1-frontend...HEAD

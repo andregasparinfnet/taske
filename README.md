@@ -2,10 +2,10 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.0.0--beta.1-orange.svg)
+![Version](https://img.shields.io/badge/version-1.0.0--rc.1-orange.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
-![Tests](https://img.shields.io/badge/tests-44%20passing-brightgreen.svg)
-![Coverage](https://img.shields.io/badge/coverage-98%25-brightgreen.svg)
+![Tests](https://img.shields.io/badge/tests-123%20passing-brightgreen.svg)
+![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen.svg)
 
 **Uma aplicação full-stack moderna para gerenciamento de compromissos pessoais e profissionais**
 
@@ -28,7 +28,7 @@ O **LifeOS** é um sistema completo de gestão pessoal que permite organizar com
 Desenvolvido como projeto acadêmico para demonstrar competências em desenvolvimento full-stack, incluindo:
 - Arquitetura RESTful
 - Autenticação JWT
-- Testes automatizados
+- Testes automatizados (Unitários e Integração)
 - Design responsivo moderno
 
 ---
@@ -72,21 +72,21 @@ Desenvolvido como projeto acadêmico para demonstrar competências em desenvolvi
 ### Backend
 | Tecnologia | Versão | Descrição |
 |------------|--------|-----------|
-| Java | 17+ | Linguagem principal |
-| Spring Boot | 3.x | Framework web |
+| Java | 21+ | Linguagem principal |
+| Spring Boot | 3.4.1 | Framework web |
 | Spring Security | 6.x | Autenticação e autorização |
 | PostgreSQL | 15+ | Banco de dados |
-| JWT | - | Tokens de autenticação |
+| JWT | 0.11.5 | Tokens de autenticação |
 | Maven | 3.x | Gerenciador de dependências |
 
 ### Frontend
 | Tecnologia | Versão | Descrição |
 |------------|--------|-----------|
-| React | 18.x | Biblioteca UI |
-| Vite | 5.x | Build tool |
+| React | 19.x | Biblioteca UI |
+| Vite | 7.x | Build tool |
 | Axios | 1.x | Cliente HTTP |
-| @hello-pangea/dnd | 16.x | Drag and drop |
-| Lucide React | 0.x | Ícones |
+| @hello-pangea/dnd | 18.x | Drag and drop |
+| Lucide React | 0.56 | Ícones |
 | Vitest | 2.x | Framework de testes |
 
 ### DevOps
@@ -164,7 +164,7 @@ found 0 vulnerabilities ✅
 
 
 ### Pré-requisitos
-- Java 17+
+- Java 21+
 - Node.js 18+
 - PostgreSQL 15+ (ou Docker)
 - Maven 3+
@@ -179,14 +179,14 @@ cd lifeos
 
 **Opção A: Docker (Recomendado)**
 ```bash
-docker-compose up -d postgres
+docker-compose up -d --build
 ```
 
 **Opção B: PostgreSQL local**
 ```sql
-CREATE DATABASE taske;
-CREATE USER perit WITH PASSWORD 'sua-senha';
-GRANT ALL PRIVILEGES ON DATABASE taske TO perit;
+CREATE DATABASE lifeos_db;
+CREATE USER postgres WITH PASSWORD 'admin';
+GRANT ALL PRIVILEGES ON DATABASE lifeos_db TO postgres;
 ```
 
 ### 3. Inicie o Backend
@@ -242,19 +242,20 @@ cd frontend
 npm test
 
 # Rodar testes com cobertura
-npm test -- --coverage --run
+npm run test:coverage -- --run
 ```
 
 ### Cobertura Atual
 
 | Arquivo | Statements | Branches | Functions | Lines |
 |---------|------------|----------|-----------|-------|
-| **Total** | **98.01%** | **92.38%** | **86.20%** | **98.01%** |
-| App.jsx | 94.52% | 81.25% | 80.00% | 94.52% |
-| KanbanView.jsx | 93.16% | 87.50% | 83.33% | 93.16% |
-| Login.jsx | 98.42% | 94.11% | 100% | 98.42% |
+| **Total** | **90.58%** | **95.96%** | **97.53%** | **90.14%** |
+| App.jsx | 100% | 98.57% | 100% | 100% |
+| KanbanView.jsx | 100% | 100% | 100% | 100% |
+| Login.jsx | 97.43% | 97.22% | 100% | 97.43% |
 | DashboardView.jsx | 100% | 100% | 100% | 100% |
-| AgendaView.jsx | 100% | 91.66% | 100% | 100% |
+| AgendaView.jsx | 78.87% | 95.00% | 94.11% | 76.19% |
+| api.js | 79.31% | 93.75% | 93.75% | 79.31% |
 
 ---
 

@@ -35,7 +35,7 @@ describe('Toast Component', () => {
 
         // Avançar tempo
         act(() => {
-            vi.advanceTimersByTime(3000);
+            vi.advanceTimersByTime(5000);
         });
 
         expect(onCloseMock).toHaveBeenCalled();

@@ -5,6 +5,16 @@ Todas as mudanças notáveis neste projeto serão documentadas neste arquivo.
 O formato é baseado em [Keep a Changelog](https://keepachangelog.com/pt-BR/1.0.0/),
 e este projeto adere ao [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
+## [1.0.0-rc.1] - 2026-02-01
+
+### 🚀 Release Candidate
+
+Versão candidata a lançamento com backend sincronizado e melhorias de segurança.
+
+### 🔧 Alterado
+- Sincronização de versão com o Frontend.
+- Preparação para lançamento Release Candidate.
+
 ## [1.0.0-beta.1] - 2026-01-31
 
 ### 🚧 Versão Beta
@@ -85,5 +95,6 @@ jwt.expiration=86400000
 
 ---
 
+[1.0.0-rc.1]: https://github.com/seu-usuario/lifeos/releases/tag/v1.0.0-rc.1-backend
 [1.0.0-beta.1]: https://github.com/seu-usuario/lifeos/releases/tag/v1.0.0-beta.1-backend
-[Unreleased]: https://github.com/seu-usuario/lifeos/compare/v1.0.0-beta.1-backend...HEAD
+[Unreleased]: https://github.com/seu-usuario/lifeos/compare/v1.0.0-rc.1-backend...HEAD

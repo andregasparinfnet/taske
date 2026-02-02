@@ -1,8 +1,34 @@
 import { useState } from 'react';
-import { Calendar, Clock, MapPin, AlertTriangle, Filter, Layers } from 'lucide-react';
+import { Calendar, Clock, MapPin, AlertTriangle, Filter, Layers, Download } from 'lucide-react';
+import apiClient from '../../services/api';
 
 const AgendaView = ({ compromissos }) => {
     const [activeFilter, setActiveFilter] = useState('all');
+    const [exporting, setExporting] = useState(false);
+
+    const handleExport = async () => {
+        try {
+            setExporting(true);
+            const res = await apiClient.get('/compromissos/export', {
+                params: { format: 'csv' },
+                responseType: 'blob'
+            });
+            const blob = new Blob([res.data], { type: 'text/csv;charset=utf-8' });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'compromissos.csv';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            window.URL.revokeObjectURL(url);
+        } catch (e) {
+            console.error('Export error:', e);
+            alert('Falha ao exportar compromissos. Tente novamente.');
+        } finally {
+            setExporting(false);
+        }
+    };
 
     // Helper functions for dates
     const getStartOfDay = (date) => {
@@ -70,6 +96,28 @@ const AgendaView = ({ compromissos }) => {
     return (
         <div className="agenda-view" style={{ maxWidth: '800px', margin: '0 auto' }}>
 
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem' }}>
+                <button
+                    onClick={handleExport}
+                    disabled={exporting}
+                    style={{
+                        background: 'var(--primary)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '0.6rem 1rem',
+                        borderRadius: '8px',
+                        fontWeight: 600,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        cursor: exporting ? 'not-allowed' : 'pointer',
+                        opacity: exporting ? 0.7 : 1
+                    }}
+                >
+                    <Download size={18} />
+                    {exporting ? 'Exportando...' : 'Exportar CSV'}
+                </button>
+            </div>
             {/* Filter Buttons (Dashboard Style) */}
             <div className="stats-grid" style={{ marginBottom: '2rem', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
                 <div

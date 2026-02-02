@@ -4,7 +4,6 @@ import java.util.List;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.CrossOrigin;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -12,70 +11,95 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
-import com.example.backend.model.Compromisso;
-import com.example.backend.repository.CompromissoRepository;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import java.io.PrintWriter;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
+import java.time.format.DateTimeFormatter;
+
+import com.example.backend.dto.CompromissoRequestDTO;
+import com.example.backend.dto.CompromissoResponseDTO;
+import com.example.backend.service.CompromissoService;
 
 import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/api/compromissos")
-@CrossOrigin(origins = "*")
 public class CompromissoController {
 
     @Autowired
-    private CompromissoRepository repository;
-
-    @Autowired
-    private com.example.backend.repository.UsuarioRepository usuarioRepository;
+    private CompromissoService service;
 
     @GetMapping
-    public List<Compromisso> listar(java.security.Principal principal) {
-        return repository.findByUsuarioUsername(principal.getName());
+    public List<CompromissoResponseDTO> listar(java.security.Principal principal) {
+        return service.listarTodos(principal.getName());
     }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    public Compromisso criar(@RequestBody @Valid Compromisso compromisso, java.security.Principal principal) {
-        var usuario = usuarioRepository.findByUsername(principal.getName())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Usuário não encontrado"));
-        
-        compromisso.setUsuario(usuario);
-        return repository.save(compromisso);
+    public CompromissoResponseDTO criar(@RequestBody @Valid CompromissoRequestDTO dto, java.security.Principal principal) {
+        return service.criar(dto, principal.getName());
     }
 
     @PutMapping("/{id}")
-    public Compromisso atualizar(@PathVariable Long id, @RequestBody @Valid Compromisso compromisso, java.security.Principal principal) {
-        return repository.findById(id)
-                .map(record -> {
-                    // Security Check: Is Owner?
-                    if (!record.getUsuario().getUsername().equals(principal.getName())) {
-                        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Acesso negado ao recurso");
-                    }
-                    
-                    record.setTitulo(compromisso.getTitulo());
-                    record.setDataHora(compromisso.getDataHora());
-                    record.setTipo(compromisso.getTipo());
-                    record.setUrgente(compromisso.isUrgente());
-                    record.setStatus(compromisso.getStatus());
-                    record.setValor(compromisso.getValor());
-                    record.setDescricao(compromisso.getDescricao());
-                    return repository.save(record);
-                })
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Compromisso não encontrado"));
+    public CompromissoResponseDTO atualizar(@PathVariable Long id, @RequestBody @Valid CompromissoRequestDTO dto, java.security.Principal principal) {
+        return service.atualizar(id, dto, principal.getName());
     }
 
     @DeleteMapping("/{id}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deletar(@PathVariable Long id, java.security.Principal principal) {
-        repository.findById(id).ifPresent(record -> {
-            if (!record.getUsuario().getUsername().equals(principal.getName())) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Acesso negado ao recurso");
-            }
-            repository.deleteById(id);
-        });
+        try {
+            service.deletar(id, principal.getName());
+        } catch (com.example.backend.exception.RecursoNaoEncontradoException e) {
+            // Idempotent delete: if resource doesn't exist, we consider it deleted.
+        }
     }
+
+    @GetMapping("/export")
+    public void exportar(
+            @RequestParam(name = "format", defaultValue = "csv") String format,
+            java.security.Principal principal,
+            HttpServletResponse response
+    ) throws IOException {
+        if (!"csv".equalsIgnoreCase(format)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Formato não suportado: " + format);
+        }
+
+        var lista = service.listarTodos(principal.getName());
+
+        String filename = URLEncoder.encode("compromissos-" + principal.getName() + ".csv", StandardCharsets.UTF_8);
+        response.setContentType("text/csv; charset=UTF-8");
+        response.setHeader("Content-Disposition", "attachment; filename=\"" + filename + "\"");
+
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm");
+        try (PrintWriter writer = response.getWriter()) {
+            writer.println("id,titulo,dataHora,tipo,status,valor,urgente,descricao");
+            for (var c : lista) {
+                String csvTitulo = com.example.backend.util.CsvUtils.sanitize(c.getTitulo());
+                String csvDescricao = com.example.backend.util.CsvUtils.sanitize(c.getDescricao());
+                String dataHora = c.getDataHora() != null ? dtf.format(c.getDataHora()) : "";
+                String valor = (c.getValor() != null) ? c.getValor().toString() : "";
+                String urgente = c.isUrgente() ? "true" : "false";
+                writer.printf("%d,%s,%s,%s,%s,%s,%s,%s%n",
+                        c.getId(),
+                        csvTitulo,
+                        dataHora,
+                        c.getTipo() != null ? c.getTipo().name() : "",
+                        c.getStatus() != null ? c.getStatus().name() : "",
+                        valor,
+                        urgente,
+                        csvDescricao
+                );
+            }
+            writer.flush();
+        }
+    }
+
 }

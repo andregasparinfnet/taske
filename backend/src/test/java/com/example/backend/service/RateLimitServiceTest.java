@@ -1,15 +1,19 @@
 package com.example.backend.service;
 
-import io.github.bucket4j.Bucket;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
-import static org.junit.jupiter.api.Assertions.*;
+import io.github.bucket4j.Bucket;
 
 /**
  * Security Tests for RateLimitService
@@ -26,6 +30,10 @@ class RateLimitServiceTest {
     @BeforeEach
     void setUp() {
         rateLimitService = new RateLimitService();
+        // Set @Value fields manually since this is a unit test
+        ReflectionTestUtils.setField(rateLimitService, "capacity", 5);
+        ReflectionTestUtils.setField(rateLimitService, "refillMinutes", 1);
+        
         // Clear any existing buckets
         Map<String, Bucket> buckets = new ConcurrentHashMap<>();
         ReflectionTestUtils.setField(rateLimitService, "buckets", buckets);
@@ -141,6 +149,10 @@ class RateLimitServiceTest {
         
         // We can test that a fresh bucket allows requests again
         rateLimitService = new RateLimitService(); // New service = new buckets
+        // Set @Value fields manually since this is a unit test (not Spring context)
+        ReflectionTestUtils.setField(rateLimitService, "capacity", 5);
+        ReflectionTestUtils.setField(rateLimitService, "refillMinutes", 1);
+        ReflectionTestUtils.setField(rateLimitService, "buckets", new ConcurrentHashMap<String, Bucket>());
         boolean result = rateLimitService.tryConsume(TEST_IP);
         
         // Assert

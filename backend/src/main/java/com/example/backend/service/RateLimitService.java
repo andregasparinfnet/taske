@@ -1,15 +1,16 @@
 package com.example.backend.service;
 
-import io.github.bucket4j.Bandwidth;
-import io.github.bucket4j.Bucket;
-import io.github.bucket4j.Refill;
+import java.time.Duration;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
-import java.time.Duration;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
+import io.github.bucket4j.Bandwidth;
+import io.github.bucket4j.Bucket;
+import io.github.bucket4j.Refill;
 
 /**
  * Rate Limiting Service using Token Bucket algorithm (Bucket4j)
@@ -28,9 +29,11 @@ public class RateLimitService {
     // Store buckets per IP address
     private final Map<String, Bucket> buckets = new ConcurrentHashMap<>();
     
-    // Rate limit configuration: 5 attempts per 1 minute
-    private static final int CAPACITY = 5;
-    private static final Duration REFILL_DURATION = Duration.ofMinutes(1);
+    @org.springframework.beans.factory.annotation.Value("${rate.limit.capacity:100}")
+    private int capacity;
+    
+    @org.springframework.beans.factory.annotation.Value("${rate.limit.refill-minutes:1}")
+    private int refillMinutes;
     
     /**
      * Try to consume 1 token from the bucket for the given IP
@@ -62,7 +65,7 @@ public class RateLimitService {
      * Create new bucket with configured limits
      */
     private Bucket createNewBucket() {
-        Bandwidth limit = Bandwidth.classic(CAPACITY, Refill.intervally(CAPACITY, REFILL_DURATION));
+        Bandwidth limit = Bandwidth.classic(capacity, Refill.intervally(capacity, Duration.ofMinutes(refillMinutes)));
         return Bucket.builder()
                 .addLimit(limit)
                 .build();
@@ -74,7 +77,7 @@ public class RateLimitService {
     public long getAvailableTokens(String ip) {
         Bucket bucket = buckets.get(ip);
         if (bucket == null) {
-            return CAPACITY;
+            return capacity;
         }
         return bucket.getAvailableTokens();
     }

@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import * as api from './api';
-import Login from './Login';
-import KanbanView from './KanbanView';
-import AgendaView from './AgendaView';
-import DashboardView from './DashboardView';
-import Toast from './Toast';
-import ConfirmModal from './ConfirmModal';
+import * as api from './services/api';
+import Login from './views/Login/Login';
+import KanbanView from './views/Kanban/KanbanView';
+import AgendaView from './views/Agenda/AgendaView';
+import DashboardView from './views/Dashboard/DashboardView';
+import Toast from './components/Toast/Toast';
+import ConfirmModal from './components/ConfirmModal/ConfirmModal';
 import './App.css';
 import {
   LayoutDashboard,
