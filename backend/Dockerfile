@@ -11,6 +11,8 @@ RUN mvn clean package -DskipTests
 FROM eclipse-temurin:21-jre-alpine
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
+COPY entrypoint.sh .
+RUN chmod +x entrypoint.sh
 EXPOSE 8080
-# LIMITADOR DE MEMÓRIA (Essencial para o Render Free):
-ENTRYPOINT ["/bin/sh", "-c", "export SPRING_DATASOURCE_URL=jdbc:postgresql://${DB_HOST:-localhost}:${DB_PORT:-5432}/${DB_NAME:-taske} && java -Xmx350m -jar app.jar"]
+# LIMITADOR DE MEMÓRIA e Configuração de BD Robusta via Script:
+ENTRYPOINT ["./entrypoint.sh"]
