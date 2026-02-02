@@ -30,7 +30,7 @@ services:
     rootDir: ./frontend
     buildCommand: npm install && npm run build
     staticPublishPath: dist     # Pasta onde o Vite gera os arquivos
-    plan: free
+    # plan: free (Removed to fix validation error - Static sites default to free)
     # region: removed (Static sites are global)
     envVars:
       - key: VITE_API_URL
